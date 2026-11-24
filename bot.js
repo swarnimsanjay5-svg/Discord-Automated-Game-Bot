@@ -777,3 +777,781 @@ const POKEMON_MOVES = {
         { name: 'Bullet Punch',  damage: [60, 85], emoji: '🔩👊', special: false },
         { name: 'Psychic Fang',  damage: [92, 128],emoji: '🌀🦷', special: true  },
     ],
+    
+   latios:     [
+        { name: 'Luster Purge',  damage: [82, 115],emoji: '💙✨', special: true  },
+        { name: 'Dragon Pulse',  damage: [72, 100],emoji: '🐉💙', special: false },
+        { name: 'Psychic Boost', damage: [78, 108],emoji: '🌀💙', special: true  },
+        { name: 'Mist Ball',     damage: [88, 122],emoji: '🌫️💙', special: true  },
+    ],
+    latias:     [
+        { name: 'Mist Ball',     damage: [80, 112],emoji: '🌫️❤️', special: true  },
+        { name: 'Charm',         damage: [55, 78], emoji: '💕🐉', special: false },
+        { name: 'Draco Meteor',  damage: [88, 122],emoji: '🌠❤️', special: true  },
+        { name: 'Dragon Breath', damage: [68, 95], emoji: '🐉❤️', special: false },
+    ],
+    giratina:   [
+        { name: 'Shadow Force',  damage: [102,142],emoji: '👻🌑', special: true  },
+        { name: 'Aura Sphere',   damage: [85, 118],emoji: '✨🔮', special: true  },
+        { name: 'Dragon Pulse',  damage: [78, 108],emoji: '🐉🌑', special: false },
+        { name: 'Ancient Power', damage: [72, 100],emoji: '🪨⚫', special: false },
+    ],
+    dialga:     [
+        { name: 'Roar of Time',  damage: [108,150],emoji: '⏱️🐉', special: true  },
+        { name: 'Metal Burst',   damage: [88, 122],emoji: '🔩💥', special: true  },
+        { name: 'Dragon Claw',   damage: [78, 108],emoji: '🐉⏰', special: false },
+        { name: 'Flash Cannon',  damage: [82, 115],emoji: '💡🔷', special: true  },
+    ],
+    palkia:     [
+        { name: 'Spacial Rend',  damage: [108,148],emoji: '🌌🔱', special: true  },
+        { name: 'Hydro Pump',    damage: [88, 120],emoji: '🌊🔱', special: true  },
+        { name: 'Dragon Pulse',  damage: [80, 112],emoji: '🐉🌌', special: false },
+        { name: 'Aqua Ring',     damage: [72, 100],emoji: '💧🔱', special: false },
+    ],
+    reshiram:   [
+        { name: 'Blue Flare',    damage: [112,155],emoji: '🔥💙', special: true  },
+        { name: 'Fusion Flare',  damage: [98, 138],emoji: '🔥⚪', special: true  },
+        { name: 'Dragon Breath', damage: [80, 112],emoji: '🐉🔥', special: false },
+        { name: 'Hyper Voice',   damage: [75, 105],emoji: '📣🔥', special: false },
+    ],
+    zekrom:     [
+        { name: 'Bolt Strike',   damage: [112,155],emoji: '⚡🔱', special: true  },
+        { name: 'Fusion Bolt',   damage: [98, 138],emoji: '⚡⚫', special: true  },
+        { name: 'Dragon Claw',   damage: [80, 112],emoji: '🐉⚡', special: false },
+        { name: 'Outrage',       damage: [88, 122],emoji: '💢⚡', special: false },
+    ],
+    kyurem:     [
+        { name: 'Ice Burn',      damage: [108,148],emoji: '🔥🧊', special: true  },
+        { name: 'Freeze Shock',  damage: [102,142],emoji: '❄️⚡', special: true  },
+        { name: 'Dragon Pulse',  damage: [82, 115],emoji: '🐉❄️', special: false },
+        { name: 'Glaciate',      damage: [88, 122],emoji: '🧊💨', special: true  },
+    ],
+    xerneas:    [
+        { name: 'Geomancy',      damage: [95, 132],emoji: '🌺🌟', special: true  },
+        { name: 'Moonblast',     damage: [88, 122],emoji: '🌙✨', special: true  },
+        { name: 'Fairy Wind',    damage: [72, 100],emoji: '🌸💨', special: false },
+        { name: 'Close Combat',  damage: [80, 112],emoji: '🦌💥', special: false },
+    ],
+    yveltal:    [
+        { name: 'Oblivion Wing', damage: [108,148],emoji: '🌑🦅', special: true  },
+        { name: 'Dark Pulse',    damage: [85, 118],emoji: '🌑💜', special: false },
+        { name: 'Sky Attack',    damage: [80, 112],emoji: '☁️⚫', special: false },
+        { name: 'Death Wing',    damage: [98, 138],emoji: '💀🦅', special: true  },
+    ],
+    zygarde:    [
+        { name: 'Land\'s Wrath', damage: [102,142],emoji: '🌍🐍', special: true  },
+        { name: 'Thousand Arrows',damage: [92,128],emoji: '🏹🌿', special: true  },
+        { name: 'Dragon Pulse',  damage: [78, 108],emoji: '🐉🌿', special: false },
+        { name: 'Core Enforcer', damage: [98, 138],emoji: '🌟🐍', special: true  },
+    ],
+    solgaleo:   [
+        { name: 'Sunsteel Strike',damage: [112,155],emoji: '☀️🦁', special: true  },
+        { name: 'Zen Headbutt',  damage: [85, 118],emoji: '🌀🦁', special: false },
+        { name: 'Solar Blade',   damage: [98, 138],emoji: '☀️⚔️', special: true  },
+        { name: 'Full Metal Body',damage: [80, 112],emoji: '🔩🦁', special: false },
+    ],
+    lunala:     [
+        { name: 'Moongeist Beam',damage: [112,155],emoji: '🌙🦇', special: true  },
+        { name: 'Shadow Ray',    damage: [98, 138],emoji: '👻🌙', special: true  },
+        { name: 'Moonblast',     damage: [85, 118],emoji: '🌙✨', special: false },
+        { name: 'Phantom Force', damage: [80, 112],emoji: '👻💜', special: false },
+    ],
+    necrozma:   [
+        { name: 'Prismatic Laser',damage: [118,162],emoji: '🌈🔱', special: true  },
+        { name: 'Photon Geyser', damage: [105,145],emoji: '💡💥', special: true  },
+        { name: 'Power Gem',     damage: [88, 122],emoji: '💎⚡', special: false },
+        { name: 'Searing Light', damage: [95, 132],emoji: '☀️🔱', special: true  },
+    ],
+    zacian:     [
+        { name: 'Behemoth Blade',damage: [118,162],emoji: '⚔️🌸', special: true  },
+        { name: 'Play Rough',    damage: [88, 122],emoji: '🐾💕', special: false },
+        { name: 'Sacred Sword',  damage: [98, 138],emoji: '⚔️✨', special: true  },
+        { name: 'Iron Head',     damage: [82, 115],emoji: '🔩👑', special: false },
+    ],
+    zamazenta:  [
+        { name: 'Behemoth Bash', damage: [118,162],emoji: '🛡️💙', special: true  },
+        { name: 'Close Combat',  damage: [88, 122],emoji: '👊🛡️', special: false },
+        { name: 'Sacred Sword',  damage: [95, 132],emoji: '⚔️🔵', special: true  },
+        { name: 'Body Press',    damage: [82, 115],emoji: '💪🔵', special: false },
+    ],
+};
+
+// Default moves for wild/unconfigured Pokémon
+const DEFAULT_MOVES = [
+    { name: 'Tackle',    damage: [15, 30], emoji: '💪', special: false },
+    { name: 'Scratch',   damage: [20, 35], emoji: '✋', special: false },
+    { name: 'Growl',     damage: [10, 20], emoji: '😾', special: false },
+    { name: 'Quick Hit', damage: [25, 40], emoji: '💨', special: false },
+];
+
+function xpRequiredForLevel(level) {
+    const lv = Math.max(1, Number(level) || 1);
+    return Math.floor(100 * Math.pow(1.25, lv - 1));
+}
+function addPokemonXp(pokemon, amount) {
+    if (!pokemon) return { gained: 0, levels: 0, oldLevel: 1, newLevel: 1 };
+    const gained = Math.max(0, Math.floor(Number(amount) || 0));
+    const oldLevel = Math.max(1, Number(pokemon.level) || 1);
+    pokemon.level = oldLevel; pokemon.xp = Math.max(0, Number(pokemon.xp) || 0);
+    pokemon.maxXp = xpRequiredForLevel(pokemon.level);
+    pokemon.xp += gained; let levels = 0;
+    while (pokemon.xp >= pokemon.maxXp) {
+        pokemon.xp -= pokemon.maxXp; pokemon.level += 1; levels += 1;
+        const hpGain = Math.max(3, Math.floor((pokemon.maxHp || 50) * 0.06));
+        const atkGain = Math.max(2, Math.floor((pokemon.atk || 50) * 0.05));
+        pokemon.maxHp = (pokemon.maxHp || 50) + hpGain; pokemon.hp = Math.min(pokemon.maxHp, (pokemon.hp || 0) + hpGain); pokemon.atk = (pokemon.atk || 50) + atkGain;
+        pokemon.maxXp = xpRequiredForLevel(pokemon.level);
+    }
+    return { gained, levels, oldLevel, newLevel: pokemon.level };
+}
+function xpForWildPokemon(wild) { return ({ Weak:20, Common:35, Rare:60, Epic:90, Legendary:140, Mythical:180 })[wild?.rarity] || 30; }
+function getPokemonXpLine(pokemon) { const lv=Math.max(1,Number(pokemon?.level)||1), xp=Math.max(0,Number(pokemon?.xp)||0); return `Lv.${lv} • XP ${xp}/${xpRequiredForLevel(lv)}`; }
+
+function getMovesForPokemon(pokeName) {
+    return POKEMON_MOVES[pokeName.toLowerCase()] || DEFAULT_MOVES;
+}
+
+// FIX: battle damage used to be rolled purely from the move's fixed range and
+// completely ignored the attacker's ATK stat — so ATK gained from food, level-ups,
+// or drink buffs had zero effect on actual damage dealt. This scales the rolled
+// damage by the attacker's ATK relative to the 50-point baseline every Pokémon
+// starts at, clamped so a single stat can't trivialize or nullify a fight.
+function rollMoveDamage(move, attackerAtk) {
+    const base = Math.floor(Math.random() * (move.damage[1] - move.damage[0] + 1)) + move.damage[0];
+    const atkMultiplier = Math.max(0.6, Math.min(2.2, (Number(attackerAtk) || 50) / 50));
+    return Math.max(1, Math.round(base * atkMultiplier));
+}
+
+// ── WILD POKÉMON POOL ─────────────────────────────────────────────────────────
+const WILD_POKEMON_POOL = [
+    // ── WEAK (easy first catches for new players) ──────────────────────────────
+    { name: 'Rattata',     hp: 30,  atk: 35,  emoji: '🐭',   dexId: 19,  rarity: 'Weak', category: 'Normal'   },
+    { name: 'Pidgey',      hp: 40,  atk: 40,  emoji: '🐦',   dexId: 16,  rarity: 'Weak', category: 'Normal'   },
+    { name: 'Meowth',      hp: 40,  atk: 42,  emoji: '🐱',   dexId: 52,  rarity: 'Weak', category: 'Normal'   },
+    { name: 'Caterpie',    hp: 28,  atk: 25,  emoji: '🐛',   dexId: 10,  rarity: 'Weak', category: 'Normal'   },
+    { name: 'Weedle',      hp: 28,  atk: 28,  emoji: '🐝',   dexId: 13,  rarity: 'Weak', category: 'Poison'   },
+    { name: 'Magikarp',    hp: 20,  atk: 10,  emoji: '🐟',   dexId: 129, rarity: 'Weak', category: 'Water'    },
+    { name: 'Zubat',       hp: 35,  atk: 38,  emoji: '🦇',   dexId: 41,  rarity: 'Weak', category: 'Poison'   },
+    { name: 'Spearow',     hp: 38,  atk: 40,  emoji: '🦅',   dexId: 21,  rarity: 'Weak', category: 'Normal'   },
+    { name: 'Ekans',       hp: 35,  atk: 38,  emoji: '🐍',   dexId: 23,  rarity: 'Weak', category: 'Poison'   },
+    { name: 'Sandshrew',   hp: 42,  atk: 40,  emoji: '🐾',   dexId: 27,  rarity: 'Weak', category: 'Ground'   },
+    { name: 'Jigglypuff',  hp: 55,  atk: 30,  emoji: '🌸',   dexId: 39,  rarity: 'Weak', category: 'Normal'   },
+    { name: 'Oddish',      hp: 38,  atk: 32,  emoji: '🌿',   dexId: 43,  rarity: 'Weak', category: 'Grass'    },
+    { name: 'Paras',       hp: 35,  atk: 35,  emoji: '🍄🦀', dexId: 46,  rarity: 'Weak', category: 'Bug'      },
+    { name: 'Venonat',     hp: 38,  atk: 35,  emoji: '🪲',   dexId: 48,  rarity: 'Weak', category: 'Bug'      },
+    { name: 'Diglett',     hp: 25,  atk: 42,  emoji: '⛏️',   dexId: 50,  rarity: 'Weak', category: 'Ground'   },
+    { name: 'Poliwag',     hp: 40,  atk: 35,  emoji: '🌀🐟', dexId: 60,  rarity: 'Weak', category: 'Water'    },
+    { name: 'Bellsprout',  hp: 35,  atk: 40,  emoji: '🪴',   dexId: 69,  rarity: 'Weak', category: 'Grass'    },
+    { name: 'Slowpoke',    hp: 60,  atk: 25,  emoji: '🌸🐷', dexId: 79,  rarity: 'Weak', category: 'Water'    },
+    { name: 'Seel',        hp: 45,  atk: 32,  emoji: '🦭',   dexId: 86,  rarity: 'Weak', category: 'Water'    },
+    { name: 'Shellder',    hp: 30,  atk: 40,  emoji: '🐚',   dexId: 90,  rarity: 'Weak', category: 'Water'    },
+    { name: 'Krabby',      hp: 30,  atk: 45,  emoji: '🦀',   dexId: 98,  rarity: 'Weak', category: 'Water'    },
+    { name: 'Voltorb',     hp: 40,  atk: 42,  emoji: '💣',   dexId: 100, rarity: 'Weak', category: 'Electric' },
+    { name: 'Exeggcute',   hp: 35,  atk: 30,  emoji: '🥚',   dexId: 102, rarity: 'Weak', category: 'Grass'    },
+    { name: 'Cubone',      hp: 50,  atk: 35,  emoji: '💀',   dexId: 104, rarity: 'Weak', category: 'Ground'   },
+    { name: 'Hoothoot',    hp: 45,  atk: 32,  emoji: '🦉',   dexId: 163, rarity: 'Weak', category: 'Normal'   },
+    { name: 'Ledyba',      hp: 40,  atk: 28,  emoji: '🐞',   dexId: 165, rarity: 'Weak', category: 'Bug'      },
+    { name: 'Spinarak',    hp: 38,  atk: 30,  emoji: '🕷️',   dexId: 167, rarity: 'Weak', category: 'Bug'      },
+    { name: 'Sentret',     hp: 42,  atk: 38,  emoji: '🦡',   dexId: 161, rarity: 'Weak', category: 'Normal'   },
+    { name: 'Wooper',      hp: 50,  atk: 28,  emoji: '💧🦎', dexId: 194, rarity: 'Weak', category: 'Water'    },
+    { name: 'Swinub',      hp: 50,  atk: 38,  emoji: '🐷❄️', dexId: 220, rarity: 'Weak', category: 'Ice'      },
+    { name: 'Wurmple',     hp: 35,  atk: 28,  emoji: '🐛',   dexId: 265, rarity: 'Weak', category: 'Bug'      },
+    { name: 'Zigzagoon',   hp: 40,  atk: 35,  emoji: '🦝',   dexId: 263, rarity: 'Weak', category: 'Normal'   },
+    { name: 'Bidoof',      hp: 55,  atk: 30,  emoji: '🦫',   dexId: 399, rarity: 'Weak', category: 'Normal'   },
+    { name: 'Starly',      hp: 40,  atk: 42,  emoji: '⭐🐦', dexId: 396, rarity: 'Weak', category: 'Normal'   },
+    { name: 'Shinx',       hp: 42,  atk: 45,  emoji: '⚡🦁', dexId: 403, rarity: 'Weak', category: 'Electric' },
+    { name: 'Buizel',      hp: 45,  atk: 42,  emoji: '🌊🦦', dexId: 418, rarity: 'Weak', category: 'Water'    },
+
+    // ── COMMON ────────────────────────────────────────────────────────────────
+    { name: 'Psyduck',     hp: 50,  atk: 52,  emoji: '🦆',   dexId: 54,  rarity: 'Common', category: 'Water'    },
+    { name: 'Growlithe',   hp: 55,  atk: 70,  emoji: '🐕',   dexId: 58,  rarity: 'Common', category: 'Fire'     },
+    { name: 'Abra',        hp: 25,  atk: 55,  emoji: '🔮',   dexId: 63,  rarity: 'Common', category: 'Psychic'  },
+    { name: 'Machop',      hp: 70,  atk: 80,  emoji: '💪',   dexId: 66,  rarity: 'Common', category: 'Fighting' },
+    { name: 'Totodile',    hp: 50,  atk: 65,  emoji: '🐊',   dexId: 158, rarity: 'Common', category: 'Water'    },
+    { name: 'Cyndaquil',   hp: 45,  atk: 60,  emoji: '🔥🦔', dexId: 155, rarity: 'Common', category: 'Fire'     },
+    { name: 'Chikorita',   hp: 45,  atk: 49,  emoji: '🌿',   dexId: 152, rarity: 'Common', category: 'Grass'    },
+    { name: 'Sudowoodo',   hp: 70,  atk: 65,  emoji: '🪨🌳', dexId: 185, rarity: 'Common', category: 'Rock'     },
+    { name: 'Marill',      hp: 70,  atk: 20,  emoji: '🐭💧', dexId: 183, rarity: 'Common', category: 'Water'    },
+    { name: 'Aipom',       hp: 55,  atk: 70,  emoji: '🐒',   dexId: 190, rarity: 'Common', category: 'Normal'   },
+    { name: 'Misdreavus',  hp: 60,  atk: 85,  emoji: '👻💜', dexId: 200, rarity: 'Common', category: 'Ghost'    },
+    { name: 'Snubbull',    hp: 60,  atk: 80,  emoji: '🐶💕', dexId: 209, rarity: 'Common', category: 'Normal'   },
+    { name: 'Treecko',     hp: 40,  atk: 55,  emoji: '🌿🦎', dexId: 252, rarity: 'Common', category: 'Grass'    },
+    { name: 'Torchic',     hp: 40,  atk: 60,  emoji: '🐤🔥', dexId: 255, rarity: 'Common', category: 'Fire'     },
+    { name: 'Mudkip',      hp: 50,  atk: 55,  emoji: '💧🐸', dexId: 258, rarity: 'Common', category: 'Water'    },
+    { name: 'Poochyena',   hp: 45,  atk: 55,  emoji: '🐺',   dexId: 261, rarity: 'Common', category: 'Dark'     },
+    { name: 'Lotad',       hp: 40,  atk: 40,  emoji: '🍃💧', dexId: 270, rarity: 'Common', category: 'Water'    },
+    { name: 'Makuhita',    hp: 72,  atk: 60,  emoji: '🥊',   dexId: 296, rarity: 'Common', category: 'Fighting' },
+    { name: 'Meditite',    hp: 45,  atk: 55,  emoji: '🧘',   dexId: 307, rarity: 'Common', category: 'Fighting' },
+    { name: 'Electrike',   hp: 45,  atk: 58,  emoji: '⚡🐶', dexId: 309, rarity: 'Common', category: 'Electric' },
+    { name: 'Roselia',     hp: 50,  atk: 60,  emoji: '🌹',   dexId: 315, rarity: 'Common', category: 'Grass'    },
+    { name: 'Spoink',      hp: 60,  atk: 50,  emoji: '🐷🌀', dexId: 325, rarity: 'Common', category: 'Psychic'  },
+    { name: 'Trapinch',    hp: 45,  atk: 70,  emoji: '🏜️🦷', dexId: 328, rarity: 'Common', category: 'Ground'   },
+    { name: 'Turtwig',     hp: 55,  atk: 55,  emoji: '🐢🌿', dexId: 387, rarity: 'Common', category: 'Grass'    },
+    { name: 'Piplup',      hp: 45,  atk: 53,  emoji: '🐧💧', dexId: 393, rarity: 'Common', category: 'Water'    },
+    { name: 'Chimchar',    hp: 44,  atk: 58,  emoji: '🐒🔥', dexId: 390, rarity: 'Common', category: 'Fire'     },
+    { name: 'Riolu',       hp: 40,  atk: 70,  emoji: '🥋',   dexId: 447, rarity: 'Common', category: 'Fighting' },
+    { name: 'Gible',       hp: 58,  atk: 70,  emoji: '🐲🏜️', dexId: 443, rarity: 'Common', category: 'Dragon'   },
+    { name: 'Snivy',       hp: 45,  atk: 55,  emoji: '🐍🌿', dexId: 495, rarity: 'Common', category: 'Grass'    },
+    { name: 'Tepig',       hp: 55,  atk: 62,  emoji: '🐷🔥', dexId: 498, rarity: 'Common', category: 'Fire'     },
+    { name: 'Oshawott',    hp: 55,  atk: 55,  emoji: '🌊🦦', dexId: 501, rarity: 'Common', category: 'Water'    },
+    { name: 'Chespin',     hp: 56,  atk: 61,  emoji: '🌰🐾', dexId: 650, rarity: 'Common', category: 'Grass'    },
+    { name: 'Fennekin',    hp: 40,  atk: 62,  emoji: '🦊🔥', dexId: 653, rarity: 'Common', category: 'Fire'     },
+    { name: 'Froakie',     hp: 41,  atk: 62,  emoji: '🐸💧', dexId: 656, rarity: 'Common', category: 'Water'    },
+
+    // ── RARE ──────────────────────────────────────────────────────────────────
+    { name: 'Haunter',     hp: 45,  atk: 85,  emoji: '👻',   dexId: 93,  rarity: 'Rare', category: 'Ghost'    },
+    { name: 'Scyther',     hp: 70,  atk: 110, emoji: '🦗',   dexId: 123, rarity: 'Rare', category: 'Bug'      },
+    { name: 'Eevee',       hp: 55,  atk: 55,  emoji: '🦊',   dexId: 133, rarity: 'Rare', category: 'Normal'   },
+    { name: 'Umbreon',     hp: 95,  atk: 65,  emoji: '🌑🦊', dexId: 197, rarity: 'Rare', category: 'Dark'     },
+    { name: 'Espeon',      hp: 65,  atk: 90,  emoji: '🌸🦊', dexId: 196, rarity: 'Rare', category: 'Psychic'  },
+    { name: 'Ampharos',    hp: 90,  atk: 85,  emoji: '⚡🐑', dexId: 181, rarity: 'Rare', category: 'Electric' },
+    { name: 'Heracross',   hp: 80,  atk: 125, emoji: '🦏🐛', dexId: 214, rarity: 'Rare', category: 'Fighting' },
+    { name: 'Sneasel',     hp: 55,  atk: 95,  emoji: '🌑❄️', dexId: 215, rarity: 'Rare', category: 'Dark'     },
+    { name: 'Porygon2',    hp: 85,  atk: 80,  emoji: '💻🌀', dexId: 233, rarity: 'Rare', category: 'Normal'   },
+    { name: 'Larvitar',    hp: 50,  atk: 64,  emoji: '🪨🦖', dexId: 246, rarity: 'Rare', category: 'Rock'     },
+    { name: 'Lucario',     hp: 70,  atk: 115, emoji: '🥋⚡', dexId: 448, rarity: 'Rare', category: 'Fighting' },
+    { name: 'Garchomp',    hp: 108, atk: 130, emoji: '🐲🏜️', dexId: 445, rarity: 'Rare', category: 'Dragon'   },
+    { name: 'Togekiss',    hp: 85,  atk: 80,  emoji: '🕊️✨', dexId: 468, rarity: 'Rare', category: 'Fairy'    },
+    { name: 'Gallade',     hp: 68,  atk: 125, emoji: '⚔️🧘', dexId: 475, rarity: 'Rare', category: 'Psychic'  },
+    { name: 'Roserade',    hp: 60,  atk: 125, emoji: '🌹🌙', dexId: 407, rarity: 'Rare', category: 'Grass'    },
+    { name: 'Breloom',     hp: 60,  atk: 130, emoji: '🍄🥊', dexId: 286, rarity: 'Rare', category: 'Fighting' },
+    { name: 'Banette',     hp: 64,  atk: 115, emoji: '🪡👻', dexId: 354, rarity: 'Rare', category: 'Ghost'    },
+    { name: 'Absol',       hp: 65,  atk: 130, emoji: '🌙🗡️', dexId: 359, rarity: 'Rare', category: 'Dark'     },
+    { name: 'Flygon',      hp: 80,  atk: 100, emoji: '🐲🏜️', dexId: 330, rarity: 'Rare', category: 'Dragon'   },
+    { name: 'Gengar',      hp: 60,  atk: 130, emoji: '👻😈', dexId: 94,  rarity: 'Rare', category: 'Ghost'    },
+    { name: 'Zoroark',     hp: 60,  atk: 105, emoji: '🦊🌑', dexId: 571, rarity: 'Rare', category: 'Dark'     },
+    { name: 'Bisharp',     hp: 65,  atk: 125, emoji: '⚔️🔪', dexId: 625, rarity: 'Rare', category: 'Dark'     },
+    { name: 'Haxorus',     hp: 76,  atk: 147, emoji: '🐉⚔️', dexId: 612, rarity: 'Rare', category: 'Dragon'   },
+    { name: 'Hydreigon',   hp: 92,  atk: 125, emoji: '🐉🌑', dexId: 635, rarity: 'Rare', category: 'Dragon'   },
+    { name: 'Noivern',     hp: 85,  atk: 70,  emoji: '🦇🐉', dexId: 715, rarity: 'Rare', category: 'Dragon'   },
+    { name: 'Goodra',      hp: 90,  atk: 100, emoji: '🌧️🐉', dexId: 706, rarity: 'Rare', category: 'Dragon'   },
+
+    // ── EPIC ──────────────────────────────────────────────────────────────────
+    { name: 'Snorlax',     hp: 160, atk: 110, emoji: '😴',   dexId: 143, rarity: 'Epic', category: 'Normal'  },
+    { name: 'Dragonite',   hp: 91,  atk: 134, emoji: '🐲',   dexId: 149, rarity: 'Epic', category: 'Dragon'  },
+    { name: 'Alakazam',    hp: 55,  atk: 50,  emoji: '🥄',   dexId: 65,  rarity: 'Epic', category: 'Psychic' },
+    { name: 'Tyranitar',   hp: 100, atk: 134, emoji: '🦖',   dexId: 248, rarity: 'Epic', category: 'Dark'    },
+    { name: 'Blaziken',    hp: 80,  atk: 120, emoji: '🔥🐓', dexId: 257, rarity: 'Epic', category: 'Fire'    },
+    { name: 'Swampert',    hp: 100, atk: 110, emoji: '🌊🐊', dexId: 260, rarity: 'Epic', category: 'Water'   },
+    { name: 'Sceptile',    hp: 70,  atk: 105, emoji: '🌿🦎', dexId: 254, rarity: 'Epic', category: 'Grass'   },
+    { name: 'Metagross',   hp: 80,  atk: 135, emoji: '🔩🌀', dexId: 376, rarity: 'Epic', category: 'Steel'   },
+    { name: 'Salamence',   hp: 95,  atk: 135, emoji: '🐉🔵', dexId: 373, rarity: 'Epic', category: 'Dragon'  },
+    { name: 'Milotic',     hp: 95,  atk: 60,  emoji: '🌊🐍', dexId: 350, rarity: 'Epic', category: 'Water'   },
+    { name: 'Infernape',   hp: 76,  atk: 104, emoji: '🔥🐒', dexId: 392, rarity: 'Epic', category: 'Fire'    },
+    { name: 'Empoleon',    hp: 84,  atk: 86,  emoji: '🐧⚔️', dexId: 395, rarity: 'Epic', category: 'Water'   },
+    { name: 'Torterra',    hp: 95,  atk: 109, emoji: '🐢🌳', dexId: 389, rarity: 'Epic', category: 'Grass'   },
+    { name: 'Electivire',  hp: 75,  atk: 123, emoji: '⚡💪', dexId: 466, rarity: 'Epic', category: 'Electric'},
+    { name: 'Magmortar',   hp: 75,  atk: 125, emoji: '🔥🦾', dexId: 467, rarity: 'Epic', category: 'Fire'    },
+    { name: 'Rhyperior',   hp: 115, atk: 140, emoji: '🪨🦏', dexId: 464, rarity: 'Epic', category: 'Rock'    },
+    { name: 'Serperior',   hp: 75,  atk: 75,  emoji: '🐍👑', dexId: 497, rarity: 'Epic', category: 'Grass'   },
+    { name: 'Emboar',      hp: 110, atk: 123, emoji: '🐷🔥', dexId: 500, rarity: 'Epic', category: 'Fire'    },
+    { name: 'Samurott',    hp: 95,  atk: 100, emoji: '🌊⚔️', dexId: 503, rarity: 'Epic', category: 'Water'   },
+    { name: 'Volcarona',   hp: 85,  atk: 135, emoji: '🔥🦋', dexId: 637, rarity: 'Epic', category: 'Fire'    },
+    { name: 'Greninja',    hp: 72,  atk: 95,  emoji: '🐸🌊', dexId: 658, rarity: 'Epic', category: 'Water'   },
+    { name: 'Chesnaught',  hp: 88,  atk: 107, emoji: '🌰🛡️', dexId: 652, rarity: 'Epic', category: 'Grass'   },
+    { name: 'Delphox',     hp: 75,  atk: 114, emoji: '🦊🔥', dexId: 655, rarity: 'Epic', category: 'Fire'    },
+
+    // ── LEGENDARY ─────────────────────────────────────────────────────────────
+    { name: 'Articuno',    hp: 90,  atk: 85,  emoji: '🧊',   dexId: 144, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Zapdos',      hp: 90,  atk: 90,  emoji: '⚡',   dexId: 145, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Moltres',     hp: 90,  atk: 100, emoji: '🔥',   dexId: 146, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Latios',      hp: 80,  atk: 130, emoji: '💙🐉', dexId: 381, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Latias',      hp: 80,  atk: 110, emoji: '❤️🐉', dexId: 380, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Groudon',     hp: 100, atk: 150, emoji: '🌋🔴', dexId: 383, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Kyogre',      hp: 100, atk: 150, emoji: '🌊🔵', dexId: 382, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Giratina',    hp: 150, atk: 100, emoji: '👻🐉', dexId: 487, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Dialga',      hp: 100, atk: 120, emoji: '⏱️🐉', dexId: 483, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Palkia',      hp: 90,  atk: 120, emoji: '🌌🐉', dexId: 484, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Reshiram',    hp: 100, atk: 150, emoji: '🔥⚪', dexId: 643, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Zekrom',      hp: 100, atk: 150, emoji: '⚡⚫', dexId: 644, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Kyurem',      hp: 125, atk: 130, emoji: '❄️🐉', dexId: 646, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Xerneas',     hp: 126, atk: 131, emoji: '🌺🦌', dexId: 716, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Yveltal',     hp: 126, atk: 131, emoji: '🌑🦅', dexId: 717, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Zygarde',     hp: 216, atk: 100, emoji: '🌿🐍', dexId: 718, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Solgaleo',    hp: 137, atk: 137, emoji: '☀️🦁', dexId: 791, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Lunala',      hp: 137, atk: 137, emoji: '🌙🦇', dexId: 792, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Zacian',      hp: 92,  atk: 170, emoji: '⚔️🐺', dexId: 888, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Zamazenta',   hp: 92,  atk: 130, emoji: '🛡️🐺', dexId: 889, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Mewtwo',      hp: 106, atk: 154, emoji: '🧬🐱', dexId: 150, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Lugia',       hp: 106, atk: 90,  emoji: '🌊🦅', dexId: 249, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Eternatus',   hp: 140, atk: 145, emoji: '☠️🐉', dexId: 890, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Ho-Oh',       hp: 106, atk: 130, emoji: '🌈🦅', dexId: 250, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Rayquaza',    hp: 105, atk: 150, emoji: '🌌🐉', dexId: 384, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Heatran',     hp: 91,  atk: 130, emoji: '🔥🏔️', dexId: 485, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Regigigas',   hp: 110, atk: 160, emoji: '🗿💪', dexId: 486, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Cobalion',    hp: 91,  atk: 90,  emoji: '⚔️💎', dexId: 638, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Terrakion',   hp: 91,  atk: 129, emoji: '🪨⚔️', dexId: 639, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Virizion',    hp: 91,  atk: 90,  emoji: '🌿⚔️', dexId: 640, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Tornadus',    hp: 79,  atk: 115, emoji: '🌪️',   dexId: 641, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Thundurus',   hp: 79,  atk: 115, emoji: '⚡🌩️', dexId: 642, rarity: 'Legendary', category: 'Legendary' },
+    { name: 'Landorus',    hp: 89,  atk: 145, emoji: '🏔️💨', dexId: 645, rarity: 'Legendary', category: 'Legendary' },
+
+    // ── MYTHICAL ─────────────────────────────────────────────────────────────
+    { name: 'Mew',         hp: 100, atk: 100, emoji: '🌟🐱', dexId: 151, rarity: 'Mythical', category: 'Mythical' },
+    { name: 'Celebi',      hp: 100, atk: 100, emoji: '🌿✨', dexId: 251, rarity: 'Mythical', category: 'Mythical' },
+    { name: 'Jirachi',     hp: 100, atk: 100, emoji: '⭐🔱', dexId: 385, rarity: 'Mythical', category: 'Mythical' },
+    { name: 'Deoxys',      hp: 50,  atk: 180, emoji: '👾🌌', dexId: 386, rarity: 'Mythical', category: 'Mythical' },
+    { name: 'Darkrai',     hp: 70,  atk: 135, emoji: '🌑😈', dexId: 491, rarity: 'Mythical', category: 'Mythical' },
+    { name: 'Shaymin',     hp: 100, atk: 100, emoji: '🌸🦔', dexId: 492, rarity: 'Mythical', category: 'Mythical' },
+    { name: 'Victini',     hp: 100, atk: 100, emoji: '🔥✌️', dexId: 494, rarity: 'Mythical', category: 'Mythical' },
+    { name: 'Genesect',    hp: 71,  atk: 120, emoji: '🔩🦟', dexId: 649, rarity: 'Mythical', category: 'Mythical' },
+    { name: 'Necrozma',    hp: 97,  atk: 107, emoji: '🌈🔱', dexId: 800, rarity: 'Mythical', category: 'Mythical' },
+    { name: 'Arceus',      hp: 120, atk: 120, emoji: '🌟🐴', dexId: 493, rarity: 'Mythical', category: 'Mythical' },
+    { name: 'Hoopa',       hp: 80,  atk: 110, emoji: '🌀👺', dexId: 720, rarity: 'Mythical', category: 'Mythical' },
+    { name: 'Marshadow',   hp: 90,  atk: 125, emoji: '👊🌑', dexId: 802, rarity: 'Mythical', category: 'Mythical' },
+    { name: 'Zeraora',     hp: 88,  atk: 112, emoji: '⚡🐯', dexId: 807, rarity: 'Mythical', category: 'Mythical' },
+    { name: 'Meltan',      hp: 46,  atk: 65,  emoji: '🔩🥣', dexId: 808, rarity: 'Mythical', category: 'Mythical' },
+    { name: 'Melmetal',    hp: 135, atk: 143, emoji: '🔩💀', dexId: 809, rarity: 'Mythical', category: 'Mythical' },
+];
+
+// ── BASE-FORM STARTERS (catchable in the wild, feed into evolution chains) ─────
+WILD_POKEMON_POOL.push(
+    { name: 'Pikachu',    hp: 55,  atk: 65,  emoji: '⚡🐭', dexId: 25,  rarity: 'Common', category: 'Electric' },
+    { name: 'Charmander', hp: 50,  atk: 62,  emoji: '🔥🦎', dexId: 4,   rarity: 'Common', category: 'Fire' },
+);
+
+// ── EVOLVED FORMS ────────────────────────────────────────────────────────────
+// Obtainable in the wild directly (one rarity tier above their base form) OR by
+// using an Evolution Stone on a matching base-form Pokémon with `.evolve <name>`.
+WILD_POKEMON_POOL.push(
+    { name: 'Raichu',     hp: 80,  atk: 100, emoji: '⚡🐹',dexId: 26,  rarity: 'Rare',   category: 'Electric' },
+    { name: 'Charmeleon', hp: 70,  atk: 88,  emoji: '🔥🦎',dexId: 5,   rarity: 'Rare',   category: 'Fire'     },
+    { name: 'Charizard',  hp: 95,  atk: 130, emoji: '🔥🐉',dexId: 6,   rarity: 'Epic',   category: 'Fire'     },
+    { name: 'Raticate',   hp: 55,  atk: 82,  emoji: '🐀',   dexId: 20,  rarity: 'Common', category: 'Normal'  },
+    { name: 'Pidgeotto',  hp: 63,  atk: 68,  emoji: '🐦',   dexId: 17,  rarity: 'Common', category: 'Normal'  },
+    { name: 'Pidgeot',    hp: 83,  atk: 100, emoji: '🐦',   dexId: 18,  rarity: 'Rare',   category: 'Normal'  },
+    { name: 'Persian',    hp: 65,  atk: 78,  emoji: '🐱',   dexId: 53,  rarity: 'Common', category: 'Normal'  },
+    { name: 'Golbat',     hp: 75,  atk: 80,  emoji: '🦇',   dexId: 42,  rarity: 'Common', category: 'Poison'  },
+    { name: 'Crobat',     hp: 85,  atk: 105, emoji: '🦇',   dexId: 169, rarity: 'Rare',   category: 'Poison'  },
+    { name: 'Arcanine',   hp: 90,  atk: 115, emoji: '🐕‍🦺', dexId: 59,  rarity: 'Rare',   category: 'Fire'     },
+    { name: 'Machoke',    hp: 90,  atk: 105, emoji: '💪',   dexId: 67,  rarity: 'Common', category: 'Fighting'},
+    { name: 'Machamp',    hp: 105, atk: 135, emoji: '💪',   dexId: 68,  rarity: 'Rare',   category: 'Fighting'},
+    { name: 'Kadabra',    hp: 40,  atk: 35,  emoji: '🔮',   dexId: 64,  rarity: 'Common', category: 'Psychic' },
+    { name: 'Croconaw',   hp: 70,  atk: 85,  emoji: '🐊',   dexId: 159, rarity: 'Common', category: 'Water'   },
+    { name: 'Feraligatr', hp: 95,  atk: 118, emoji: '🐊',   dexId: 160, rarity: 'Rare',   category: 'Water'   },
+    { name: 'Quilava',    hp: 65,  atk: 82,  emoji: '🔥🦔', dexId: 156, rarity: 'Common', category: 'Fire'    },
+    { name: 'Typhlosion', hp: 90,  atk: 118, emoji: '🔥🦔', dexId: 157, rarity: 'Rare',   category: 'Fire'    },
+    { name: 'Bayleef',    hp: 65,  atk: 68,  emoji: '🌿',   dexId: 153, rarity: 'Common', category: 'Grass'   },
+    { name: 'Meganium',   hp: 90,  atk: 82,  emoji: '🌿🌸', dexId: 154, rarity: 'Rare',   category: 'Grass'   },
+    { name: 'Golduck',    hp: 75,  atk: 82,  emoji: '🦆',   dexId: 55,  rarity: 'Common', category: 'Water'   },
+    { name: 'Granbull',   hp: 85,  atk: 105, emoji: '🐶💕', dexId: 210, rarity: 'Common', category: 'Normal'  },
+    { name: 'Mismagius',  hp: 70,  atk: 105, emoji: '👻💜', dexId: 429, rarity: 'Rare',   category: 'Ghost'   },
+    { name: 'Ambipom',    hp: 70,  atk: 95,  emoji: '🐒',   dexId: 424, rarity: 'Common', category: 'Normal'  },
+    { name: 'Weavile',    hp: 70,  atk: 130, emoji: '🌑❄️', dexId: 461, rarity: 'Rare',   category: 'Dark'    },
+    { name: 'Pupitar',    hp: 70,  atk: 84,  emoji: '🪨🦖', dexId: 247, rarity: 'Common', category: 'Rock'    },
+    { name: 'Scizor',     hp: 70,  atk: 130, emoji: '🦗🔩', dexId: 212, rarity: 'Rare',   category: 'Steel'   },
+    { name: 'Porygon-Z',  hp: 85,  atk: 135, emoji: '💻🌀', dexId: 474, rarity: 'Rare',   category: 'Normal'  },
+);
+
+// ── EXTRA POKÉMON ─────────────────────────────────────────────────────────────
+// Additional catchable Pokémon. They use DEFAULT_MOVES until custom moves are configured.
+WILD_POKEMON_POOL.push(
+    { name: 'Elekid',      hp: 45,  atk: 62,  emoji: '⚡👶', dexId: 239, rarity: 'Common', category: 'Electric' },
+    { name: 'Magby',       hp: 45,  atk: 64,  emoji: '🔥👶', dexId: 240, rarity: 'Common', category: 'Fire' },
+    { name: 'Swablu',      hp: 55,  atk: 45,  emoji: '☁️🐦', dexId: 333, rarity: 'Common', category: 'Flying' },
+    { name: 'Mawile',      hp: 70,  atk: 78,  emoji: '🧚‍♀️🦷', dexId: 303, rarity: 'Rare', category: 'Steel' },
+    { name: 'Rotom',       hp: 65,  atk: 95,  emoji: '⚡👻', dexId: 479, rarity: 'Rare', category: 'Electric' },
+    { name: 'Litwick',     hp: 50,  atk: 70,  emoji: '🕯️👻', dexId: 607, rarity: 'Common', category: 'Ghost' },
+    { name: 'Mimikyu',     hp: 75,  atk: 105, emoji: '👻🎭', dexId: 778, rarity: 'Epic', category: 'Ghost' },
+    { name: 'Axew',        hp: 55,  atk: 88,  emoji: '🦎🪓', dexId: 610, rarity: 'Rare', category: 'Dragon' },
+    { name: 'Rookidee',    hp: 45,  atk: 58,  emoji: '🐦⚫', dexId: 821, rarity: 'Common', category: 'Flying' },
+    { name: 'Yamper',      hp: 55,  atk: 72,  emoji: '⚡🐕', dexId: 835, rarity: 'Common', category: 'Electric' },
+    { name: 'Snom',        hp: 42,  atk: 38,  emoji: '❄️🐛', dexId: 872, rarity: 'Weak', category: 'Ice' },
+    { name: 'Dreepy',      hp: 48,  atk: 82,  emoji: '👻🐉', dexId: 885, rarity: 'Rare', category: 'Dragon' },
+    { name: 'Fuecoco',     hp: 62,  atk: 68,  emoji: '🔥🐊', dexId: 909, rarity: 'Common', category: 'Fire' },
+    { name: 'Sprigatito',  hp: 50,  atk: 66,  emoji: '🌿🐱', dexId: 906, rarity: 'Common', category: 'Grass' },
+    { name: 'Quaxly',      hp: 52,  atk: 64,  emoji: '💧🦆', dexId: 912, rarity: 'Common', category: 'Water' },
+    { name: 'Tinkatink',   hp: 55,  atk: 72,  emoji: '🔨🧚', dexId: 957, rarity: 'Rare', category: 'Fairy' },
+    { name: 'Frigibax',    hp: 65,  atk: 86,  emoji: '🧊🐉', dexId: 996, rarity: 'Rare', category: 'Dragon' },
+    { name: 'Pawmi',       hp: 48,  atk: 70,  emoji: '⚡🐭', dexId: 921, rarity: 'Weak', category: 'Electric' }
+);
+
+// ── EVOLUTION CHAINS ─────────────────────────────────────────────────────────
+// Used by `.evolve <pokemon>` with an Evolution Stone. Base name (lowercase) -> next form.
+// Stats for the evolved form are pulled live from WILD_POKEMON_POOL above.
+const EVOLUTION_MAP = {
+    pikachu:    'Raichu',
+    charmander: 'Charmeleon',
+    charmeleon: 'Charizard',
+    rattata:    'Raticate',
+    pidgey:     'Pidgeotto',
+    pidgeotto:  'Pidgeot',
+    meowth:     'Persian',
+    zubat:      'Golbat',
+    golbat:     'Crobat',
+    growlithe:  'Arcanine',
+    machop:     'Machoke',
+    machoke:    'Machamp',
+    abra:       'Kadabra',
+    kadabra:    'Alakazam',
+    totodile:   'Croconaw',
+    croconaw:   'Feraligatr',
+    cyndaquil:  'Quilava',
+    quilava:    'Typhlosion',
+    chikorita:  'Bayleef',
+    bayleef:    'Meganium',
+    psyduck:    'Golduck',
+    snubbull:   'Granbull',
+    misdreavus: 'Mismagius',
+    aipom:      'Ambipom',
+    sneasel:    'Weavile',
+    larvitar:   'Pupitar',
+    pupitar:    'Tyranitar',
+    scyther:    'Scizor',
+    porygon2:   'Porygon-Z',
+};
+
+// ── FISH SELL PRICES ──────────────────────────────────────────────────────────
+const FISH_SELL_PRICES = {
+    fish:       { key: 'fish',      price: 200,  name: 'Standard Minnow Fish', emoji: '🐟' },
+    salmon:     { key: 'salmon',    price: 800,  name: 'Premium Salmon',       emoji: '🐟' },
+    goldenfish: { key: 'goldenFish',price: 5000, name: 'Legendary Golden Fish', emoji: '✨🐟' },
+    golden:     { key: 'goldenFish',price: 5000, name: 'Legendary Golden Fish', emoji: '✨🐟' },
+};
+
+// ── AMAZON BAGS ───────────────────────────────────────────────────────────────
+const AMAZON_BAGS = {
+    tote:              { name: 'Canvas Tote Bag 🛍️',        price: 5000,     emoji: '🛍️', desc: 'Basic everyday carry. Simple but honest.' },
+    skybag:            { name: 'Skybag Traveller 🎒',        price: 25000,    emoji: '🎒', desc: 'Great for trips and daily use.' },
+    safari:            { name: 'Safari Duffle Bag 🟤',       price: 50000,    emoji: '🟤', desc: 'Rugged and spacious. Adventure-ready.' },
+    aristocrat:        { name: 'Aristocrat Suitcase 🧳',     price: 55000,    emoji: '🧳', desc: 'Premium hard-shell luggage.' },
+    americantourister: { name: 'American Tourister ✈️',      price: 75000,    emoji: '✈️', desc: 'Top-tier travel companion. Sleek design.' },
+    gucci:             { name: 'Gucci Bag 💼',               price: 100000,   emoji: '💼', desc: 'Luxury fashion statement. Flex on everyone.' },
+    hermes:            { name: 'Hermès Birkin 👜',           price: 200000,   emoji: '👜', desc: 'Ultra-rare. The pinnacle of flex culture.' },
+};
+
+// ── BANK SYSTEM ──────────────────────────────────────────────────────────────
+const BANK_DEFAULT_CAPACITY = 500_000;
+const CREDIT_BUILD_MIN_LOAN = 25_000;
+const CREDIT_BUILD_MIN_HOLD_MS = 12 * 60 * 60 * 1000;
+const CREDIT_BUILD_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+const CREDIT_BUILD_MAX_POSITIVE = 60;
+
+
+const CAPACITY_PACKAGES = [
+    { id: 1,  label: '+500K',  increase: 500_000,      cost: 150_000     },
+    { id: 2,  label: '+1M',    increase: 1_000_000,    cost: 450_000     },
+    { id: 3,  label: '+5M',    increase: 5_000_000,    cost: 1_500_000   },
+    { id: 4,  label: '+10M',   increase: 10_000_000,   cost: 3_000_000   },
+    { id: 5,  label: '+50M',   increase: 50_000_000,   cost: 20_000_000  },
+    { id: 6,  label: '+100M',  increase: 100_000_000,  cost: 50_000_000  },
+    { id: 7,  label: '+500M',  increase: 500_000_000,  cost: 300_000_000 },
+    { id: 8,  label: '+1B',    increase: 1_000_000_000,    cost: 700_000_000   },
+    { id: 9,  label: '+10B',   increase: 10_000_000_000,   cost: 6_000_000_000 },
+    { id: 10, label: '+50B',   increase: 50_000_000_000,   cost: 30_000_000_000 },
+];
+
+// ── VIP PASS — for trillionaires ──────────────────────────────────────────────
+const VIP_MONTHLY_FEE      = 10_000_000;  // $10M monthly fee
+const VIP_DURATION_MS      = 30 * 24 * 60 * 60 * 1000; // 30 days
+const VIP_REMINDER_3D_MS   = 3  * 24 * 60 * 60 * 1000; // send reminder at 3 days left
+const VIP_REMINDER_1D_MS   = 1  * 24 * 60 * 60 * 1000; // send urgent reminder at 1 day left
+
+const BANK_LOAN_TIERS = [
+    {
+        label: 'Micro', min: 1_000, max: 50_000, days: 2, interest: 0.05,
+        ratings: [
+            { maxDays: 2,        label: '⭐ Excellent', creditDelta: +20 },
+            { maxDays: 4,        label: '✅ Good',      creditDelta: +10 },
+            { maxDays: 6,        label: '🆗 Average',   creditDelta:   0 },
+            { maxDays: 8,        label: '⚠️ Late',      creditDelta: -10 },
+            { maxDays: Infinity, label: '❌ Defaulted', creditDelta: -30 },
+        ],
+    },
+    {
+        label: 'Small', min: 50_001, max: 500_000, days: 4, interest: 0.08,
+        ratings: [
+            { maxDays: 3,        label: '⭐ Excellent', creditDelta: +25 },
+            { maxDays: 5,        label: '✅ Good',      creditDelta: +12 },
+            { maxDays: 7,        label: '🆗 Average',   creditDelta:   0 },
+            { maxDays: 10,       label: '⚠️ Late',      creditDelta: -15 },
+            { maxDays: Infinity, label: '❌ Defaulted', creditDelta: -40 },
+        ],
+    },
+    {
+        label: 'Medium', min: 500_001, max: 2_000_000, days: 7, interest: 0.12,
+        ratings: [
+            { maxDays: 5,        label: '⭐ Excellent', creditDelta: +30 },
+            { maxDays: 7,        label: '✅ Good',      creditDelta: +15 },
+            { maxDays: 10,       label: '🆗 Average',   creditDelta:   0 },
+            { maxDays: 14,       label: '⚠️ Late',      creditDelta: -20 },
+            { maxDays: Infinity, label: '❌ Defaulted', creditDelta: -50 },
+        ],
+    },
+    {
+        label: 'Large', min: 2_000_001, max: 10_000_000, days: 14, interest: 0.18,
+        ratings: [
+            { maxDays: 10,       label: '⭐ Excellent', creditDelta: +40 },
+            { maxDays: 14,       label: '✅ Good',      creditDelta: +20 },
+            { maxDays: 18,       label: '🆗 Average',   creditDelta:   0 },
+            { maxDays: 21,       label: '⚠️ Late',      creditDelta: -30 },
+            { maxDays: Infinity, label: '❌ Defaulted', creditDelta: -70 },
+        ],
+    },
+    {
+        label: 'Elite', min: 10_000_001, max: Infinity, days: 30, interest: 0.25,
+        minCredit: 700,
+        ratings: [
+            { maxDays: 20,       label: '⭐ Excellent', creditDelta: +60 },
+            { maxDays: 30,       label: '✅ Good',      creditDelta: +30 },
+            { maxDays: 40,       label: '🆗 Average',   creditDelta:   0 },
+            { maxDays: 50,       label: '⚠️ Late',      creditDelta: -50 },
+            { maxDays: Infinity, label: '❌ Defaulted', creditDelta: -100 },
+        ],
+    },
+];
+
+function getCreditBand(score) {
+    if (score >= 800) return { label: '💎 Platinum', maxLoan: Infinity };
+    if (score >= 700) return { label: '🥇 Gold',     maxLoan: Infinity };
+    if (score >= 550) return { label: '🥈 Silver',   maxLoan: 10_000_000 };
+    if (score >= 400) return { label: '🥉 Bronze',   maxLoan: 2_000_000 };
+    if (score >= 250) return { label: '📉 Low',      maxLoan: 500_000 };
+    return               { label: '🚫 Poor',      maxLoan: 50_000 };
+}
+
+function getLoanTier(amount) {
+    return BANK_LOAN_TIERS.find(t => amount >= t.min && amount <= t.max) || null;
+}
+
+// ── BALANCE-BASED LOAN CAP ────────────────────────────────────────────────────
+// Loans are no longer sanctioned purely off credit score / a free first-loan
+// bypass. Instead, the max loan a user can take is also capped as a multiple
+// of their RECENT AVERAGE balance (wallet+bank), not just their instantaneous
+// balance — so stuffing cash into the bank right before requesting a loan
+// (then withdrawing it) doesn't game the cap.
+const BALANCE_LOAN_MULTIPLIER = 4;      // max loan = up to 4x recent avg balance
+const BALANCE_HISTORY_WINDOW_DAYS = 7;  // "recent" = last 7 daily snapshots
+const BALANCE_HISTORY_MAX_ENTRIES = 14; // keep a bit of buffer beyond the window
+
+// Record a daily net-worth snapshot for every user (called by a scheduled job).
+function recordBalanceSnapshots() {
+    const now = Date.now();
+    for (const [userId, u] of Object.entries(db)) {
+        if (userId.startsWith('_') || !u || typeof u !== 'object' || !u.registered) continue;
+        if (!Array.isArray(u.balanceHistory)) u.balanceHistory = [];
+        const netWorth = (u.wallet || 0) + (u.bank || 0);
+        u.balanceHistory.push({ ts: now, netWorth });
+        if (u.balanceHistory.length > BALANCE_HISTORY_MAX_ENTRIES) {
+            u.balanceHistory.splice(0, u.balanceHistory.length - BALANCE_HISTORY_MAX_ENTRIES);
+        }
+    }
+    saveDB();
+}
+
+// Recent average balance for a single user — average of snapshots taken within
+// the last BALANCE_HISTORY_WINDOW_DAYS. Falls back to current net worth if the
+// user has no snapshot history yet (e.g. brand new account).
+function getRecentAvgBalance(u) {
+    const currentNetWorth = (u.wallet || 0) + (u.bank || 0);
+    if (!Array.isArray(u.balanceHistory) || u.balanceHistory.length === 0) return currentNetWorth;
+    const cutoff = Date.now() - BALANCE_HISTORY_WINDOW_DAYS * 86_400_000;
+    const recent = u.balanceHistory.filter(e => e.ts >= cutoff);
+    if (recent.length === 0) return currentNetWorth;
+    const sum = recent.reduce((acc, e) => acc + (e.netWorth || 0), 0);
+    return sum / recent.length;
+}
+
+// The actual max loan for a user: the tighter of their credit-band cap and
+// their balance-based cap.
+function getMaxLoanForUser(u) {
+    const band = getCreditBand(u.creditScore);
+    const recentAvg = getRecentAvgBalance(u);
+    const balanceCap = Math.floor(recentAvg * BALANCE_LOAN_MULTIPLIER);
+    return { band, recentAvg, balanceCap, maxLoan: Math.min(band.maxLoan, balanceCap) };
+}
+
+// ── LOTTERY ──────────────────────────────────────────────────────────────────
+// Players buy a $70K ticket via `.buy lottery`. Once 5 distinct players
+// have entered, the draw fires automatically: top 3 entrants (picked at random
+// from the 5) win cash prizes from their tier's range, the other 2 get nothing.
+// Results are announced in whichever GC a mod has designated via `.lll`
+// (falls back to the GC the 5th ticket was bought in if none is set).
+const LOTTERY_TICKET_PRICE = 70000;
+const LOTTERY_POOL_SIZE    = 5;
+const LOTTERY_PRIZES = [
+    { place: 1, label: '🥇 1st Place', min: 300000, max: 500000 },
+    { place: 2, label: '🥈 2nd Place', min: 160000, max: 200000 },
+    { place: 3, label: '🥉 3rd Place', min: 70000,  max: 150000 },
+];
+
+
+// ── COOLDOWNS (seconds) ───────────────────────────────────────────────────────
+const CD_DIG = 45, CD_FISH = 45, CD_CASINO = 300, CD_SLOTS = 60,
+      CD_DB = 60, CD_ROULETTE = 60, CD_COINFLIP = 60, CD_CHEAT = 600, CD_ROB = 60;
+
+// ── DYNAMIC GAMBLING ODDS ─────────────────────────────────────────────────────
+// Each game has a live house-win chance that drifts in the background instead of
+// using one fixed percentage forever. Values are persisted so a restart doesn't
+// reset the current market.
+const GAMBLING_RATE_RANGES = {
+    casino:      [38, 38],
+    slots:       [30, 30],
+    slotsDouble: [0, 0],
+    slotsTriple: [30, 30],
+    roulette:    [25, 25],
+    coinflip:    [25, 25],
+    double:      [33, 33],
+};
+function clampRate(v, range) { return Math.max(range[0], Math.min(range[1], Number(v))); }
+function ensureDynamicGamblingRates() {
+    if (!db._config.gamblingRates) db._config.gamblingRates = {};
+    for (const [key, range] of Object.entries(GAMBLING_RATE_RANGES)) {
+        if (!Number.isFinite(Number(db._config.gamblingRates[key]))) {
+            db._config.gamblingRates[key] = Number((range[0] + Math.random() * (range[1] - range[0])).toFixed(2));
+        }
+    }
+    return db._config.gamblingRates;
+}
+function getDynamicGamblingRate(game) {
+    const rates = ensureDynamicGamblingRates();
+    const range = GAMBLING_RATE_RANGES[game];
+    return clampRate(rates[game], range);
+}
+function driftGamblingRates() {
+    const rates = ensureDynamicGamblingRates();
+    for (const [key, range] of Object.entries(GAMBLING_RATE_RANGES)) {
+        // Mostly small downward movement, with frequent small recoveries.
+        const delta = Math.random() < 0.62 ? -(0.05 + Math.random() * 0.20) : (0.01 + Math.random() * 0.10);
+        rates[key] = Number(clampRate(rates[key] + delta, range).toFixed(2));
+    }
+    saveDB();
+}
+const AVAILABLE_BAGS = ['Skybag', 'Safari Bag', 'Aristocrat Bag', 'Gucci Bag 💼', 'American Tourister'];
+
+const ROAST_MESSAGES = [
+    "Look at this script kiddie trying to run dev cheats in a group! Go execute `.dig` and work hard for once. 🤡",
+    "Bro really thought he could hack his way into wealth while everyone was watching. Absolute clown energy! 🧠❌",
+    "Nice try, master hacker! Next time try executing your masterplans in my DMs, not in public. How embarrassing! 😂"
+];
+
+// ── CATCH GIF URL ─────────────────────────────────────────────────────────────
+const POKEBALL_GIF_URL = 'https://media.tenor.com/5n7JF3bVDfYAAAAC/pokeball-throw.gif';
+
+// Official PokeAPI artwork for any Pokémon, by dexId — free, no uploads needed.
+function pokemonArtUrl(dexId) {
+    return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${dexId || 1}.png`;
+}
+async function getPokemonArtMedia(dexId) {
+    return MessageMedia.fromUrl(pokemonArtUrl(dexId));
+}
+
+// Prefer a local pokeball-wobble GIF from assets/ (drop in assets/pokeball_wobble.gif),
+// falling back to the Tenor URL above if it's not there.
+async function getPokeballWobbleMedia() {
+    const localPath = path.join(__dirname, 'assets', 'pokeball_wobble.gif');
+    if (fs.existsSync(localPath)) return MessageMedia.fromFilePath(localPath);
+    return MessageMedia.fromUrl(POKEBALL_GIF_URL);
+}
+
+// ── ASSET IMAGE PATHS ────────────────────────────────────────────────────────
+const path = require('path');
+const ASSETS = {
+    coin:        path.join(__dirname, 'assets', 'coin.png'),
+    treasureBox: path.join(__dirname, 'assets', 'treasure_box.png'),
+    fishBlue:    path.join(__dirname, 'assets', 'fish_blue.png'),
+    fishSalmon:  path.join(__dirname, 'assets', 'fish_salmon.png'),
+    fishGold:    path.join(__dirname, 'assets', 'fish_gold.png'),
+    deposit:     path.join(__dirname, 'assets', 'deposit.png'),
+    withdraw:    path.join(__dirname, 'assets', 'withdraw.png'),
+    zombie:      path.join(__dirname, 'assets', 'zombie.png'),
+    shark:       path.join(__dirname, 'assets', 'shark.png'),
+};
+
+// ── DB HELPERS ────────────────────────────────────────────────────────────────
+// ── SAFE DB LOAD with backup ─────────────────────────────────────────────────
+const DB_BACKUP = DB_FILE + '.bak';
+if (fs.existsSync(DB_FILE)) {
+    try {
+        const raw = fs.readFileSync(DB_FILE, 'utf8');
+        if (!raw || raw.trim() === '') throw new Error('Empty file');
+        db = JSON.parse(raw);
+        // Save a good backup every time we load successfully
+        fs.writeFileSync(DB_BACKUP, raw);
+        console.log(`✅ Database loaded (${Object.keys(db).length} entries)`);
+    } catch (e) {
+        console.error(`⚠️ database.json corrupted: ${e.message} — trying backup...`);
+        if (fs.existsSync(DB_BACKUP)) {
+            try {
+                db = JSON.parse(fs.readFileSync(DB_BACKUP, 'utf8'));
+                console.log('✅ Restored from backup!');
+            } catch (e2) {
+                console.error('❌ Backup also corrupted. Starting fresh.');
+                db = {};
+            }
+        } else {
+            console.error('❌ No backup found. Starting fresh.');
+            db = {};
+        }
+    }
+} else {
+    console.log('ℹ️ No database found — starting fresh.');
+}
+if (!db._config) db._config = { botActive: true };
+if (!db._config.amexInvitesSent) db._config.amexInvitesSent = {};
+// Per-GC active state: { [chatId]: true/false }
+if (!db._config.gcActive)  db._config.gcActive  = {};
+// Lobby GCs set: { [chatId]: true }
+if (!db._config.lobbyGCs)  db._config.lobbyGCs  = {};
+// Dedicated Pokémon GC: only spawn wild Pokémon & allow .catch/.throwball here
+if (db._config.pokemonChannelId === undefined) db._config.pokemonChannelId = null;
+// Redeem codes: { [code]: { amount, creatorId, createdAt, claimed: false, claimedBy, claimedAt } }
+if (!db._redeemCodes) db._redeemCodes = {};
+// Banned users set: { [userId]: { bannedBy, at } }
+if (!db._config.bannedUsers) db._config.bannedUsers = {};
+// Dynamically added mods / FBI agents (persisted across restarts) — hydrate into the runtime arrays
+if (!db._config.extraMods) db._config.extraMods = [];
+if (!db._config.extraFbiAgents) db._config.extraFbiAgents = [];
+for (const id of db._config.extraMods) if (!MOD_NUMBERS.includes(id)) MOD_NUMBERS.push(id);
+for (const id of db._config.extraFbiAgents) if (!FBI_NUMBERS.includes(id)) FBI_NUMBERS.push(id);
+// Lottery state: pooled entries (max 5) + the GC designated for result announcements
+if (!db._config.lottery) db._config.lottery = { entries: [], announceChannelId: null, lastResult: null };
+if (db._config.lottery.entries === undefined)          db._config.lottery.entries = [];
+if (db._config.lottery.announceChannelId === undefined) db._config.lottery.announceChannelId = null;
+if (db._config.lottery.lastResult === undefined)        db._config.lottery.lastResult = null;
+
+// Start the live gambling-rate market after the database has been loaded.
+ensureDynamicGamblingRates();
+setInterval(driftGamblingRates, 30_000);
+
+// ── AFK storage: { userId: { since: timestamp, reason: string } } ────────
+if (!db._config.afk) db._config.afk = {};
+
+// ── ONE-TIME MIGRATION: old default starting wallet was $550,000 — reset ──
+// every existing user's wallet to $0 to match the new $0 starting balance.
+// Guarded by a flag file so this never re-runs (and re-zeroes earnings) on
+// a later restart.
+const WALLET_RESET_FLAG = './wallet_reset_v1.flag';
+if (!fs.existsSync(WALLET_RESET_FLAG)) {
+    const isValidDiscordId = id => /^\d{17,19}$/.test(id);
+    let resetCount = 0;
+    for (const id of Object.keys(db)) {
+        if (id !== '_config' && isValidDiscordId(id) && db[id] && db[id].wallet !== undefined) {
+            db[id].wallet = 0;
+            resetCount++;
+        }
+    }
+    try {
+        fs.writeFileSync(WALLET_RESET_FLAG, new Date().toISOString());
+        console.log(`💰 One-time migration: reset ${resetCount} existing user wallet(s) to $0.`);
+        saveDB();
+    } catch (e) {
+        console.error('⚠️ Could not write wallet reset flag:', e.message);
+    }
+}
+
+// Helper: is bot active in this specific chat?
+function isBotActiveInChat(chatId) {
+    // Defensive: old databases may not have all config fields.
+    if (!db._config) db._config = {};
+    if (!db._config.gcActive) db._config.gcActive = {};
+    // Essential onboarding commands must remain available.
+    // Other commands still obey the normal botActive / per-GC switch.
+    if (db._config.gcActive[chatId] !== undefined) return !!db._config.gcActive[chatId];
+    return db._config.botActive !== false;
+}
+
+// Helper: is this chat a lobby GC?
+function isLobbyGC(chatId) {
+    return !!db._config.lobbyGCs[chatId];
+}
