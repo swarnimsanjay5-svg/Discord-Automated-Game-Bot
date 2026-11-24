@@ -1555,3 +1555,748 @@ function isBotActiveInChat(chatId) {
 function isLobbyGC(chatId) {
     return !!db._config.lobbyGCs[chatId];
 }
+
+
+    
+
+// Commands blocked in lobby GCs (gambling + pokemon catching/play)
+const LOBBY_BLOCKED_COMMANDS = new Set([
+    '.casino', '.slots', '.roulette', '.db', '.double', '.cf', '.coinflip',
+    '.rob', '.catch', '.throwball', '.play'
+]);
+
+
+// ── NUMBER FORMATTER ─────────────────────────────────────────────────────────
+// Always uses en-US locale so commas appear consistently (1,000 / 1,000,000)
+// regardless of the server's system locale or Node.js ICU build.
+function formatNum(n) {
+    const num = Number(n);
+    if (!isFinite(num)) return String(n);
+    return num.toLocaleString('en-US');
+}
+
+// ── VIP-AWARE BANK CAPACITY ────────────────────────────────────────────────────
+// VIP Pass gives UNLIMITED bank space while active — we never mutate u.maxCapacity
+// for this, so the instant VIP lapses/isn't recharged, capacity is exactly what it
+// was before (no bonus to subtract, nothing to "revert").
+function isVipActive(u) {
+    return !!(u && u.vip && u.vip.active && u.vip.expiresAt > Date.now());
+}
+function getBankCapacity(u) {
+    return isVipActive(u) ? Infinity : (u.maxCapacity || 500_000);
+}
+function formatCapacity(u) {
+    return isVipActive(u) ? '💎 Unlimited (VIP)' : `$${formatNum(u.maxCapacity || 500_000)}`;
+}
+// Charges nothing itself — caller must already have deducted VIP_MONTHLY_FEE.
+// Activates a fresh VIP Pass, or extends an already-active one by 30 more days.
+// Never touches u.maxCapacity — unlimited space comes purely from isVipActive().
+function activateOrRenewVip(u) {
+    const now = Date.now();
+    const wasActive = isVipActive(u);
+    if (wasActive) {
+        u.vip.expiresAt += VIP_DURATION_MS;
+        u.vip.reminder3dSent = false;
+        u.vip.reminder1dSent = false;
+    } else {
+        u.vip = {
+            active: true,
+            expiresAt: now + VIP_DURATION_MS,
+            reminder3dSent: false,
+            reminder1dSent: false,
+        };
+    }
+    return wasActive;
+}
+
+// ── AMOUNT SHORTHAND PARSER ───────────────────────────────────────────────────
+// Parses "50k" → 50000, "2.5m" → 2500000, "1b" → 1000000000, "all" → handled externally
+// Returns NaN if unparseable.
+// No single gambling wager may exceed 5% of the player's total wealth.
+const MAX_GAMBLE_WEALTH_PERCENT = 0.05;
+function getMaxGambleBet(userId) {
+    return Math.max(0, Math.floor(getNetWorth(userId) * MAX_GAMBLE_WEALTH_PERCENT));
+}
+function validateGambleBet(userId, bet) {
+    const u = db[userId];
+    const maxBet = getMaxGambleBet(userId);
+    if (!Number.isFinite(bet) || bet <= 0 || bet > (u?.wallet || 0)) return { ok:false, maxBet, reason:'wallet' };
+    if (bet > maxBet) return { ok:false, maxBet, reason:'wealth' };
+    return { ok:true, maxBet };
+}
+
+function parseAmount(str, walletForAll) {
+    if (!str) return NaN;
+    const s = str.toString().toLowerCase().trim();
+    if (s === 'all' && walletForAll !== undefined) return walletForAll;
+    const match = s.match(/^(\d+(?:\.\d+)?)(k|m|b)?$/);
+    if (!match) return NaN;
+    const num = parseFloat(match[1]);
+    const mult = match[2] === 'k' ? 1_000 : match[2] === 'm' ? 1_000_000 : match[2] === 'b' ? 1_000_000_000 : 1;
+    return Math.floor(num * mult);
+}
+
+// ── PROFILE / ACTIVITY / XP SYSTEM ────────────────────────────────────────────
+// Discord bots cannot see literal keystrokes, so typing rate is measured from
+// messages sent: messages/minute, words/minute and chars/minute over 5 minutes.
+const PROFILE_ACTIVITY_WINDOW_MS = 5 * 60 * 1000;
+// FIX: XP earning made tougher/slower — longer cooldown, smaller gains per tick,
+// lower daily cap, and steeper per-level growth. Plain chat no longer grants XP at all
+// (see messageCreate handler) — only commands/games do now.
+const PROFILE_XP_COOLDOWN_MS = 60 * 1000;
+const PROFILE_XP_DAILY_CAP = 300;
+const PROFILE_XP_COMMAND = 2;
+const PROFILE_XP_GAME_BONUS = 4;
+const PROFILE_LEVEL_BASE = 100;
+const PROFILE_LEVEL_GROWTH = 1.28;
+const PROFILE_LEVEL_REWARDS = {
+    2:  { cash: 25000, text: '💰 $25K' },
+    3:  { cash: 50000, text: '💰 $50K' },
+    5:  { cash: 100000, text: '💰 $100K + 2× 🔴 Pokéball' },
+    10: { cash: 250000, text: '💰 $250K + 2× 🔵 Great Ball' },
+    15: { cash: 500000, text: '💰 $500K + 2× ⚫ Ultra Ball' },
+    20: { cash: 1000000, text: '💰 $1M + 1× 🟣 Master Ball' },
+};
+function profileXpRequired(level) {
+    return Math.floor(PROFILE_LEVEL_BASE * Math.pow(PROFILE_LEVEL_GROWTH, Math.max(0, (Number(level) || 1) - 1)));
+}
+function profileLevelForXp(totalXp) {
+    let level = 1, remaining = Math.max(0, Number(totalXp) || 0), need = profileXpRequired(level);
+    while (remaining >= need && level < 100) { remaining -= need; level++; need = profileXpRequired(level); }
+    return { level, currentXp: remaining, needed: need };
+}
+function grantProfileLevelReward(u, level) {
+    const reward = PROFILE_LEVEL_REWARDS[level];
+    if (!reward) return null;
+    u.wallet = (u.wallet || 0) + (reward.cash || 0);
+    if (level === 5) u.inventory.pokeball = (u.inventory.pokeball || 0) + 2;
+    if (level === 10) u.inventory.greatball = (u.inventory.greatball || 0) + 2;
+    if (level === 15) u.inventory.ultraball = (u.inventory.ultraball || 0) + 2;
+    if (level === 20) u.inventory.masterball = (u.inventory.masterball || 0) + 1;
+    return reward.text;
+}
+function trimProfileActivity(u, now = Date.now()) {
+    if (!Array.isArray(u.activityLog)) u.activityLog = [];
+    const cutoff = now - PROFILE_ACTIVITY_WINDOW_MS;
+    u.activityLog = u.activityLog.filter(e => e.ts >= cutoff);
+}
+function getProfileTypingStats(u) {
+    trimProfileActivity(u);
+    const entries = u.activityLog || [];
+    const messages = entries.length;
+    const words = entries.reduce((n, e) => n + (e.words || 0), 0);
+    const chars = entries.reduce((n, e) => n + (e.chars || 0), 0);
+    const mins = Math.max(1 / 60, Math.min(5, (Date.now() - (entries[0]?.ts || Date.now())) / 60000));
+    return { messagesPerMinute: messages / mins, wordsPerMinute: words / mins, charsPerMinute: chars / mins, windowMessages: messages };
+}
+function awardProfileXp(userId, amount, reason = 'interaction') {
+    initUser(userId);
+    const u = db[userId];
+    if (!u.registered) return null;
+    const now = Date.now();
+    if (!u.profileXpDay || u.profileXpDay !== new Date(now).toDateString()) { u.profileXpDay = new Date(now).toDateString(); u.profileXpToday = 0; }
+    if ((u.profileXpToday || 0) >= PROFILE_XP_DAILY_CAP) return null;
+    if (now - (u.lastProfileXpAt || 0) < PROFILE_XP_COOLDOWN_MS) return null;
+    const gained = Math.min(Math.max(1, Math.floor(amount)), PROFILE_XP_DAILY_CAP - (u.profileXpToday || 0));
+    const before = profileLevelForXp(u.profileXp || 0);
+    u.profileXp = (u.profileXp || 0) + gained;
+    u.profileXpToday = (u.profileXpToday || 0) + gained;
+    u.lastProfileXpAt = now;
+    u.profileXpLifetime = (u.profileXpLifetime || 0) + gained;
+    const after = profileLevelForXp(u.profileXp);
+    u.profileLevel = after.level;
+    const rewards = [];
+    if (after.level > before.level) {
+        for (let lv = before.level + 1; lv <= after.level; lv++) {
+            const reward = grantProfileLevelReward(u, lv);
+            if (reward) rewards.push({ level: lv, reward });
+        }
+    }
+    saveDB();
+    return { gained, reason, level: after.level, currentXp: after.currentXp, needed: after.needed, levelledUp: after.level > before.level, rewards };
+}
+function trackUserActivity(userId, content) {
+    initUser(userId);
+    const u = db[userId];
+    if (!u.registered) return null;
+    const now = Date.now(), text = String(content || '').trim();
+    const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
+    const chars = text.length;
+    trimProfileActivity(u, now);
+    u.activityLog.push({ ts: now, words, chars });
+    u.totalMessages = (u.totalMessages || 0) + 1;
+    u.totalWords = (u.totalWords || 0) + words;
+    u.totalChars = (u.totalChars || 0) + chars;
+    u.lastActiveAt = now;
+    const stats = getProfileTypingStats(u);
+    u.typingRate = { messagesPerMinute: Number(stats.messagesPerMinute.toFixed(2)), wordsPerMinute: Number(stats.wordsPerMinute.toFixed(2)), charsPerMinute: Number(stats.charsPerMinute.toFixed(2)), measuredAt: now };
+    return stats;
+}
+function profileXpNotice(result) {
+    if (!result) return null;
+    const rewardText = result.rewards.length ? '\n🎁 *Level gift:* ' + result.rewards.map(r => 'Lv.' + r.level + ' — ' + r.reward).join(', ') : '';
+    return '✨ *PROFILE XP +' + result.gained + '*\n📈 Level **' + result.level + '** • XP **' + result.currentXp + '/' + result.needed + '**' + (result.levelledUp ? '\n🎉 *LEVEL UP!* You reached profile Level ' + result.level + '!' : '') + rewardText;
+}
+
+function saveDB() {
+    try {
+        const data = JSON.stringify(db, null, 2);
+        const tmp = DB_FILE + '.tmp';
+        fs.writeFileSync(tmp, data);   // write to temp first
+        fs.renameSync(tmp, DB_FILE);   // atomic swap — prevents corruption on crash
+    } catch (err) { console.error('DB save error:', err); }
+}
+
+function initUser(userId) {
+    // FIX: skip invalid/non-Discord IDs (old WhatsApp keys, placeholders, etc.)
+    if (!userId || !/^\d{17,19}$/.test(userId)) return;
+    if (!db[userId]) db[userId] = {};
+    const u = db[userId];
+    if (u.wallet === undefined)       u.wallet = 0;
+    if (u.profileXp === undefined) u.profileXp = 0;
+    if (u.profileXpLifetime === undefined) u.profileXpLifetime = 0;
+    if (u.profileLevel === undefined) u.profileLevel = 1;
+    if (u.profileXpToday === undefined) u.profileXpToday = 0;
+    if (u.profileXpDay === undefined) u.profileXpDay = new Date().toDateString();
+    if (u.lastProfileXpAt === undefined) u.lastProfileXpAt = 0;
+    if (u.activityLog === undefined) u.activityLog = [];
+    if (u.totalMessages === undefined) u.totalMessages = 0;
+    if (u.totalWords === undefined) u.totalWords = 0;
+    if (u.totalChars === undefined) u.totalChars = 0;
+    if (u.typingRate === undefined) u.typingRate = { messagesPerMinute: 0, wordsPerMinute: 0, charsPerMinute: 0, measuredAt: 0 };
+    if (u.firstLoanGuideShown === undefined) u.firstLoanGuideShown = false;
+    if (u.firstUpgradeGuideShown === undefined) u.firstUpgradeGuideShown = false;
+    if (u.creditBuildRepays === undefined) u.creditBuildRepays = 0;
+    if (u.creditBuildWindowStart === undefined) u.creditBuildWindowStart = 0;
+    if (u.creditBuildPositiveGain === undefined) u.creditBuildPositiveGain = 0;
+    if (u.defaultedLoanCount === undefined) u.defaultedLoanCount = 0;
+    if (u.loanDefaultBanUntil === undefined) u.loanDefaultBanUntil = null;
+    if (u.registered === undefined)   u.registered = false;
+    if (u.registeredAt === undefined) u.registeredAt = Date.now(); // track account age for transfer lock
+    if (u.bank === undefined)         u.bank = 0;
+    if (u.maxCapacity === undefined)  u.maxCapacity = 500_000;
+    if (u.creditScore === undefined)  u.creditScore = 500;
+    if (u.bankLoanCount === undefined) u.bankLoanCount = 0; // bank loans (no card needed)
+    if (u.lastTransfer === undefined)          u.lastTransfer = 0;
+    if (u.dailyTransferSent === undefined)     u.dailyTransferSent = 0;
+    if (u.dailyTransferCount === undefined)    u.dailyTransferCount = 0;
+    if (u.transferDay === undefined)           u.transferDay = '';
+    if (u.dailyTransferReceived === undefined) u.dailyTransferReceived = 0;
+    if (u.transferReceiveDay === undefined)    u.transferReceiveDay = '';
+    if (u.lastDig === undefined)      u.lastDig = 0;
+    if (u.lastFish === undefined)     u.lastFish = 0;
+    if (u.lastCasino === undefined)   u.lastCasino = 0;
+    if (u.lastSlots === undefined)    u.lastSlots = 0;
+    if (u.lastDb === undefined)       u.lastDb = 0;
+    if (u.lastRoulette === undefined) u.lastRoulette = 0;
+    if (u.lastCoinflip === undefined) u.lastCoinflip = 0;
+    if (u.lastCheat === undefined)    u.lastCheat = 0;
+    if (u.lastDaily === undefined)    u.lastDaily = 0;
+    if (u.dailyStreak === undefined)  u.dailyStreak = 0;
+    if (u.lastRob === undefined)      u.lastRob = 0;
+    if (u.dailyDbCount === undefined) u.dailyDbCount = 0;
+    if (u.lastLimitReset === undefined) u.lastLimitReset = Date.now();
+    if (u.inventory === undefined)    u.inventory = {};
+    const inv = u.inventory;
+    if (inv.shovel === undefined)       inv.shovel = 1;
+    if (inv.fishingRod === undefined)   inv.fishingRod = 1;
+    if (inv.pokeball === undefined)     inv.pokeball = 5;
+    if (inv.greatball === undefined)    inv.greatball = 0;
+    if (inv.ultraball === undefined)    inv.ultraball = 0;
+    if (inv.masterball === undefined)   inv.masterball = 0;
+    if (inv.heavyball === undefined)    inv.heavyball = 0;
+    if (inv.lureball === undefined)     inv.lureball = 0;
+    if (inv.assignedBag === undefined)  inv.assignedBag = AVAILABLE_BAGS[Math.floor(Math.random() * AVAILABLE_BAGS.length)];
+    if (inv.fish === undefined)         inv.fish = 0;
+    if (inv.salmon === undefined)       inv.salmon = 0;
+    if (inv.goldenFish === undefined)   inv.goldenFish = 0;
+    // Food items
+    for (let key of Object.keys(FOOD_SHOP)) {
+        if (inv[key] === undefined) inv[key] = 0;
+    }
+    // Evolution stones
+    for (let key of Object.keys(STONE_SHOP)) {
+        if (inv[key] === undefined) inv[key] = 0;
+    }
+    for (let key of Object.keys(RARE_CANDY_SHOP)) {
+        if (inv[key] === undefined) inv[key] = 0;
+    }
+    if (u.amexCard === undefined)         u.amexCard = null;
+    if (u.amexInvitesSent === undefined)  u.amexInvitesSent = {};
+    if (u.pokemon === undefined) u.pokemon = [];
+    for (const p of u.pokemon) { p.level=p.level||1; p.xp=p.xp||0; p.maxXp=p.maxXp||xpRequiredForLevel(p.level); }
+    // Active battle team — names of up to 6 Pokémon from u.pokemon. Everything else lives in the PC (box).
+    if (u.team === undefined) u.team = u.pokemon.slice(0, 6).map(p => p.name);
+    // mrbeast daily usage per pokemon: { pokemonName: { count, lastReset } }
+    // Permanent ATK boost from food (cumulative, saved to DB)
+    if (u.permAtkBoost === undefined) u.permAtkBoost = {};
+    if (u.permHpBoost === undefined) u.permHpBoost = {};
+    // Toxicity tracker per pokemon: { pokemonName: { alcoholCount, cigarCount, toxicUntil } }
+    // ATK buffs from food (temporary, per battle): stored but reset after use
+    if (u.atkBuff === undefined) u.atkBuff = 0;
+    // Bank loan system (credit-score based — 4-day gambling ban if not repaid)
+    if (u.bankLoan === undefined)           u.bankLoan           = null;
+    if (u.loanBanUntil === undefined)       u.loanBanUntil       = null; // timestamp: bank loan gambling ban until
+    if (u.bankLoanOverdueAt === undefined)  u.bankLoanOverdueAt  = null; // timestamp: when bank loan first went overdue
+    // Daily net-worth snapshots used to cap loans against RECENT balance,
+    // not just instantaneous balance (see BALANCE-BASED LOAN CAP above)
+    if (u.balanceHistory === undefined)     u.balanceHistory     = [];
+    // Track when user first joined
+    if (u.joinedAt === undefined) u.joinedAt = Date.now();
+    // VIP Pass — for trillionaires. Grants UNLIMITED bank space while active.
+    // { active, expiresAt, reminder3dSent, reminder1dSent }
+    if (u.vip === undefined) u.vip = null;
+    for (const oldFood of ['mrbeast','rum','whiskey','cigar','cigarette','beer']) { if (u.inventory && Object.prototype.hasOwnProperty.call(u.inventory, oldFood)) delete u.inventory[oldFood]; }
+}
+
+// ── Helper: zero out a user's inventory (used by ".reset inv") ─────────────
+// Keeps the same key set initUser() expects (so nothing downstream breaks
+// on a missing field) but drives every count down to 0. assignedBag is kept
+// as-is since it's a cosmetic assignment, not a resource to "reset".
+function zeroUserInventory(userData) {
+    const keptBag = userData.inventory?.assignedBag || AVAILABLE_BAGS[Math.floor(Math.random() * AVAILABLE_BAGS.length)];
+    userData.inventory = {
+        shovel: 0,
+        fishingRod: 0,
+        pokeball: 0,
+        greatball: 0,
+        ultraball: 0,
+        masterball: 0,
+        heavyball: 0,
+        lureball: 0,
+        assignedBag: keptBag,
+        fish: 0,
+        salmon: 0,
+        goldenFish: 0,
+        rarecandy: 0,
+    };
+    for (const key of Object.keys(FOOD_SHOP)) {
+        userData.inventory[key] = 0;
+    }
+}
+
+// A user must explicitly run `.reg` before the bot will respond to any of
+// their other commands. Just being auto-created via initUser() (which can
+// happen incidentally, e.g. an admin command referencing them) does NOT
+// count as registered.
+function isRegistered(userId) {
+    return !!(db[userId] && db[userId].registered === true);
+}
+
+// ── LOTTERY DRAW ───────────────────────────────────────────────────────────────
+// Fires once db._config.lottery.entries reaches LOTTERY_POOL_SIZE. Shuffles the
+// pool, pays out the top 3 a random amount within their prize band, credits
+// wallets, resets the pool, and announces the result in the configured GC
+// (falling back to the GC that triggered the draw if no `.lll` GC is set yet).
+async function runLotteryDraw(fallbackChannel) {
+    const lottery = db._config.lottery;
+    const pool = [...lottery.entries];
+    // Shuffle (Fisher-Yates)
+    for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+
+    const winners = [];
+    for (let i = 0; i < LOTTERY_PRIZES.length; i++) {
+        const prize = LOTTERY_PRIZES[i];
+        const userId = pool[i];
+        const amount = Math.floor(Math.random() * (prize.max - prize.min + 1)) + prize.min;
+        initUser(userId);
+        db[userId].wallet += amount;
+        winners.push({ userId, amount, label: prize.label, place: prize.place });
+    }
+    const losers = pool.slice(LOTTERY_PRIZES.length); // remaining 2 entrants — no reward
+
+    // Reset the pool for the next round
+    lottery.entries = [];
+    lottery.lastResult = { winners, losers, drawnAt: Date.now() };
+    saveDB();
+
+    // Build the announcement
+    let out = `🎰 *LOTTERY DRAW COMPLETE!* 🎰\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n`;
+    out += `🎟️ 5 tickets sold — here are the results:\n\n`;
+    winners.forEach(w => {
+        out += `${w.label}: <@${w.userId}> — *+$${formatNum(w.amount)}* 💰\n`;
+    });
+    if (losers.length) {
+        out += `\n💀 *No prize:* ${losers.map(id => `<@${id}>`).join(', ')}\n`;
+    }
+    out += `\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n_New round is open — buy a ticket with \`.buy lottery\`!_`;
+
+    const mentions = pool;
+    const targetChannelId = lottery.announceChannelId;
+    let sent = false;
+    if (targetChannelId) {
+        try {
+            const channel = await client.channels.fetch(targetChannelId);
+            if (channel) {
+                await channel.send({ content: out, allowedMentions: { parse: ['users'] } });
+                sent = true;
+            }
+        } catch (e) {
+            console.error('Lottery announce-channel send failed:', e.message);
+        }
+    }
+    if (!sent && fallbackChannel) {
+        try {
+            await fallbackChannel.send({ content: out, allowedMentions: { parse: ['users'] } });
+        } catch (e) {
+            console.error('Lottery fallback-channel send failed:', e.message);
+        }
+    }
+}
+
+function checkDailyReset(userId) {
+    const now = Date.now();
+    if (now - db[userId].lastLimitReset > 86400000) {
+        db[userId].dailyDbCount = 0;
+        db[userId].lastLimitReset = now;
+        saveDB();
+    }
+}
+
+function makeProgressBar(current, max) {
+    const total = 8;
+    const filled = Math.max(0, Math.min(total, Math.round((current / max) * total)));
+    return '🟩'.repeat(filled) + '⬜'.repeat(total - filled);
+}
+
+// Track last 5 spawned Pokémon per chat to avoid repeats
+const recentSpawns = {};
+
+function pickWildPokemon(chatId) {
+    const roll = Math.random() * 100;
+    let pool;
+    // Legendary/Mythical dropped way down (0.5%-1% combined range) — everything else absorbs the difference.
+    if (roll <= 33)        pool = WILD_POKEMON_POOL.filter(p => p.rarity === 'Weak');
+    else if (roll <= 63)   pool = WILD_POKEMON_POOL.filter(p => p.rarity === 'Common');
+    else if (roll <= 84)   pool = WILD_POKEMON_POOL.filter(p => p.rarity === 'Rare');
+    else if (roll <= 98.5) pool = WILD_POKEMON_POOL.filter(p => p.rarity === 'Epic');
+    else if (roll <= 99.5) pool = WILD_POKEMON_POOL.filter(p => p.rarity === 'Legendary'); // 1%
+    else                   pool = WILD_POKEMON_POOL.filter(p => p.rarity === 'Mythical');  // 0.5%
+
+    // Anti-repeat: filter out recently spawned Pokémon in this chat
+    if (chatId) {
+        if (!recentSpawns[chatId]) recentSpawns[chatId] = [];
+        const recent = recentSpawns[chatId];
+        const filtered = pool.filter(p => !recent.includes(p.name));
+        if (filtered.length > 0) pool = filtered;
+        // Track this spawn
+        const pick = { ...pool[Math.floor(Math.random() * pool.length)] };
+        recent.push(pick.name);
+        if (recent.length > 5) recent.shift();
+        return pick;
+    }
+    return { ...pool[Math.floor(Math.random() * pool.length)] };
+}
+
+// { chatId: lastSpawnTime }
+const lastSpawnTime = {};
+
+function checkWildSpawn(chatId) {
+    if (wildPokemonState[chatId]) return false; // already a wild pokemon active
+    const now = Date.now();
+    const last = lastSpawnTime[chatId] || 0;
+    // Roughly 2 Pokémon per hour: random 25–35 minute cooldown.
+    const cdMs = (Math.floor(Math.random() * 11) + 25) * 60 * 1000;
+    if (now - last >= cdMs) {
+        lastSpawnTime[chatId] = now;
+        return true;
+    }
+    return false;
+}
+
+function generateBattleId() {
+    return 'BT' + Date.now().toString(36).toUpperCase();
+}
+
+function isToxic(userId, pokeName) {
+    const tox = db[userId]?.toxicity?.[pokeName.toLowerCase()];
+    if (!tox) return false;
+    return tox.toxicUntil && Date.now() < tox.toxicUntil;
+}
+
+function getToxicInfo(userId, pokeName) {
+    return db[userId]?.toxicity?.[pokeName.toLowerCase()] || { alcoholCount: 0, cigarCount: 0, toxicUntil: 0 };
+}
+
+// ── CLIENT EVENTS ─────────────────────────────────────────────────────────────
+client.on('qr', qr => { qrcode.generate(qr, { small: true }); console.log('👉 Scan QR:'); });
+client.on('ready', () => console.log('🚀 BOT ONLINE — ALL SYSTEMS GO'));
+
+// ── MAIN MESSAGE HANDLER ──────────────────────────────────────────────────────
+client.on('messageCreate', async msg => {
+    // Lightweight diagnostic: confirms the gateway event is reaching the handler.
+    // Set DEBUG_MESSAGES=false in .env to silence it (default: false).
+    if (process.env.DEBUG_MESSAGES === 'true') console.log('📩 messageCreate:', msg.id, msg.author?.id, JSON.stringify(msg.content || ''));
+    // FIX: deduplicate BEFORE any async work so gateway-redelivered events are
+    // rejected immediately, even before the partial fetch.
+    if (alreadyProcessed('main', msg.id)) return;
+    // FIX: partial messages/authors (Partials.Message is enabled) can arrive
+    // with msg.author missing .id until explicitly fetched — resolve that first.
+    try {
+        if (msg.partial) msg = await msg.fetch();
+        if (!msg.author) return;
+        if (typeof msg.author !== "string" && !msg.author.id) return;
+    } catch (e) {
+        console.error('Partial fetch failed:', e.message);
+        return;
+    }
+    if (!msg.__wrapped && msg.author.bot && msg.author.id !== '1528377826485473351') return;  // Allow Luna through
+    msg = wrapMessage(msg);
+    try {
+        let body = msg.body ? msg.body.trim() : '';
+        body = body.replace(/^\.\s+/, '.');
+        const senderId = msg.author || msg.from;
+        if (!body) return;
+
+        // Profile tracking is deliberately isolated from command execution.
+        // A malformed legacy profile must NEVER prevent the bot from replying.
+        try {
+            initUser(senderId);
+            if (isRegistered(senderId)) {
+                // Typing-rate stats are tracked for every message (used on the .p profile card),
+                // but this is NOT XP — XP is granted separately below, commands/games only.
+                trackUserActivity(senderId, body);
+
+                // FIX: XP used to be awarded on EVERY message, including plain chat/words.
+                // Now XP is only granted when the message is an actual command (starts with '.').
+                // Plain conversation never grants XP anymore.
+                if (body.startsWith('.')) {
+                    const quickCommand = body.split(' ')[0].toLowerCase();
+                    const quickGameCommands = new Set(['.casino','.slots','.roulette','.db','.double','.cf','.coinflip','.gamble','.dig','.fish','.rob','.catch','.throwball','.battle','.daily','.feed','.evolve','.use','.buy']);
+                    const xpAmount = quickGameCommands.has(quickCommand) ? PROFILE_XP_GAME_BONUS : PROFILE_XP_COMMAND;
+                    const autoXp = awardProfileXp(senderId, xpAmount);
+                    // FIX: only announce on an actual level-up — a reply for every single
+                    // command's XP tick was spammy/irritating. XP still gained silently otherwise.
+                    if (autoXp && autoXp.levelledUp) {
+                        await msg.reply(profileXpNotice(autoXp)).catch(() => {});
+                    }
+                }
+            }
+        } catch (profileErr) {
+            console.error('⚠️ Profile tracking skipped (command execution continues):', profileErr.message);
+        }
+
+        const chatObj = await msg.getChat();
+        const isGroupChat = chatObj.isGroup;
+
+        // ── DM COMMAND WHITELIST ──────────────────────────────────────────────
+        // Only specific commands are allowed in DMs — everything else is blocked.
+        if (!isGroupChat && body.startsWith('.')) {
+            const DM_ALLOWED = new Set([
+                '.redeem', '.claim', '.reg', '.menu', '.help',
+                '.bal', '.p', '.profile',
+                '.deposit', '.dep', '.withdraw', '.wd',
+                '.loan', '.upgrades', '.u1', '.u2', '.u3', '.u4', '.u5', '.u6', '.u7', '.u8', '.u9', '.u10',
+                // Amex card system — all allowed in DM
+                '.americanexpress', '.amex',
+                '.avail', '.mycard', '.paymaint', '.cardinfo',
+            ]);
+            const dmCmd = body.split(' ')[0].toLowerCase();
+            if (!DM_ALLOWED.has(dmCmd)) {
+                return msg.reply(
+                    `🔒 This command is not available in DMs.\n\n` +
+                    `**Commands available in DM:**\n` +
+                    `• \`.bal\` / \`.p\` — Check your balance\n` +
+                    `• \`.redeem [amount]\` — Create a redeem code (mods/owners only)\n` +
+                    `• \`.claim [code]\` — Claim a redeem code\n` +
+                    `• \`.loan\` — Loan system\n` +
+                    `• \`.americanexpress\` — Amex card guide\n` +
+                    `• \`.avail [card]\` — Get an Amex card\n` +
+                    `• \`.mycard\` — View your card & status\n` +
+                    `• \`.paymaint\` — Pay card maintenance\n` +
+                    `• \`.cardinfo [card]\` — View card details\n\n` +
+                    `_Head to the server for all other commands!_`
+                );
+            }
+        }
+
+        let isMod = await checkIsMod(msg);
+
+        // ── Handle active battle move replies ────────────────────────────────
+        // Players reply with a move name like "Thunderbolt" or "1" (move index)
+        const lowerBody = body.toLowerCase().trim();
+
+        // Check if this user is in an active battle and replying with a move
+        for (const [battleId, battle] of Object.entries(activeBattles)) {
+            const isP1Turn = battle.turn === 'p1' && senderId === battle.p1Id;
+            const isP2Turn = battle.turn === 'p2' && senderId === battle.p2Id;
+            if (!isP1Turn && !isP2Turn) continue;
+
+            const myPoke   = isP1Turn ? battle.p1 : battle.p2;
+            const oppPoke  = isP1Turn ? battle.p2 : battle.p1;
+            const myId     = senderId;
+            const oppId    = isP1Turn ? battle.p2Id : battle.p1Id;
+            const myName   = myId.split('@')[0];
+            const oppName  = oppId.split('@')[0];
+
+            const moves = getMovesForPokemon(myPoke.name);
+            let chosenMove = null;
+
+            // match by number (1-4) or name
+            const numMatch = parseInt(lowerBody);
+            if (!isNaN(numMatch) && numMatch >= 1 && numMatch <= moves.length) {
+                chosenMove = moves[numMatch - 1];
+            } else {
+                chosenMove = moves.find(m => m.name.toLowerCase() === lowerBody);
+            }
+            if (!chosenMove) break; // not a valid move, ignore
+
+            // Calculate damage — now scales with the attacker's current ATK stat
+            // (see rollMoveDamage) instead of ignoring it entirely.
+            const dmg = rollMoveDamage(chosenMove, myPoke.atk);
+            oppPoke.hp = Math.max(0, oppPoke.hp - dmg);
+
+            let moveMsg = `⚔️ *${myPoke.emoji} ${myPoke.name}* used *${chosenMove.emoji} ${chosenMove.name}*!\n` +
+                          `💥 Dealt *${dmg} damage* to ${oppPoke.emoji} ${oppPoke.name}!\n` +
+                          `❤️ ${oppPoke.name} HP: ${makeProgressBar(oppPoke.hp, oppPoke.maxHp)} (${oppPoke.hp}/${oppPoke.maxHp})\n`;
+
+            if (oppPoke.hp <= 0) {
+                // Battle over
+                delete activeBattles[battleId];
+
+                if (battle.wildMode) {
+                    // Wild Pokémon defeated — chance to catch
+                    const wild = battle.wildPokemon;
+                    moveMsg += `\n🏆 *${myPoke.name} wins!* Wild ${wild.emoji} ${wild.name} is weakened!\n\n`;
+                    moveMsg += `🎯 Use *.throwball [balltype]* to try catching it!\n` +
+                               `_(e.g. \`.throwball pokeball\` or \`.throwball ultraball\`)_\n` +
+                               `⚠️ Wild Pokémon flees in 30 seconds if not caught!`;
+                    wildPokemonState[chatObj.id._serialized] = {
+                        pokemon: { ...wild, hp: 1 },
+                        spawnTime: Date.now(),
+                        weakened: true,
+                        battleWinner: myId
+                    };
+                    // Auto-flee after 30s
+                    setTimeout(() => {
+                        const cid = chatObj.id._serialized;
+                        if (wildPokemonState[cid]?.weakened) {
+                            delete wildPokemonState[cid];
+                            chatObj.sendMessage(`💨 The weakened ${wild.emoji} ${wild.name} recovered and fled into the wild!`).catch(() => {});
+                        }
+                    }, 30000);
+                } else {
+                    // PvP battle over
+                    const winnerId  = myId;
+                    const loserId   = oppId;
+                    initUser(winnerId); initUser(loserId);
+
+                    // Sync HP back to DB. PvP victories no longer grant cash or XP.
+                    const updatePokeHp = (uid, poke) => {
+                        const party = db[uid].pokemon || [];
+                        const found = party.find(p => p.name.toLowerCase() === poke.name.toLowerCase());
+                        if (found) found.hp = poke.hp;
+                    };
+                    updatePokeHp(myId, myPoke);
+                    updatePokeHp(oppId, oppPoke);
+                    saveDB();
+                    moveMsg += `
+🏆 *${myPoke.emoji} ${myPoke.name}* won the battle!
+` +
+                               `🎖️ *Victory recorded — no cash/XP reward is awarded.*
+
+` +
+                               `💡 Heal your Pokémon with \`.feed\` before the next battle.`;
+                }
+                return chatObj.sendMessage(moveMsg, { mentions: [myId, oppId] }).catch(() => {});
+            }
+
+            // Switch turn
+            battle.turn = isP1Turn ? 'p2' : 'p1';
+
+            if (battle.wildMode && battle.turn === 'p2') {
+                // It's the wild Pokémon's turn. There's no real second player
+                // (p2Id is the placeholder 'wild'), so the bot plays this move
+                // itself instead of waiting forever for input nobody can send.
+                const wildMoves = getMovesForPokemon(battle.p2.name);
+                const wildMove = wildMoves[Math.floor(Math.random() * wildMoves.length)];
+                const wDmg = rollMoveDamage(wildMove, battle.p2.atk);
+                battle.p1.hp = Math.max(0, battle.p1.hp - wDmg);
+
+                moveMsg += `\n🟢 *${battle.p2.emoji} ${battle.p2.name}* used *${wildMove.emoji} ${wildMove.name}*!\n` +
+                           `💥 Dealt *${wDmg} damage* to ${battle.p1.emoji} ${battle.p1.name}!\n` +
+                           `❤️ ${battle.p1.name} HP: ${makeProgressBar(battle.p1.hp, battle.p1.maxHp)} (${battle.p1.hp}/${battle.p1.maxHp})\n`;
+
+                if (battle.p1.hp <= 0) {
+                    // Player's Pokémon fainted — battle over, wild Pokémon gets away
+                    delete activeBattles[battleId];
+                    initUser(myId);
+                    const party = db[myId].pokemon || [];
+                    const found = party.find(p => p.name.toLowerCase() === battle.p1.name.toLowerCase());
+                    if (found) found.hp = battle.p1.hp;
+                    saveDB();
+                    moveMsg += `\n💀 *${battle.p1.name} fainted!* The wild ${battle.p2.emoji} ${battle.p2.name} got away!\n` +
+                               `💡 Heal your Pokémon with \`.feed\` before battling again.`;
+                    return chatObj.sendMessage(moveMsg, { mentions: [myId] }).catch(() => {});
+                }
+
+                // Back to the player's turn
+                battle.turn = 'p1';
+            }
+
+            const nextId    = battle.turn === 'p1' ? battle.p1Id : battle.p2Id;
+            const nextPoke  = battle.turn === 'p1' ? battle.p1 : battle.p2;
+            const nextMoves = getMovesForPokemon(nextPoke.name);
+            moveMsg += `\n⏳ <@${nextId}>'s turn! *${nextPoke.emoji} ${nextPoke.name}*'s moves:\n`;
+            nextMoves.forEach((m, i) => { moveMsg += `${i+1}. ${m.emoji} *${m.name}* (${m.damage[0]}-${m.damage[1]} dmg)${m.special ? ' ✨' : ''}\n`; });
+            moveMsg += `\nReply with move number or name!`;
+            return chatObj.sendMessage(moveMsg, { mentions: [nextId] }).catch(() => {});
+        }
+
+        // ── AFK: welcome back on ANY message (before dot-command gate) ────────
+        const _chatIdForAfk = chatObj.id._serialized;
+        if (db._config.afk && db._config.afk[senderId] && !body.toLowerCase().startsWith('.afk')) {
+            const afkData = db._config.afk[senderId];
+            const elapsed = Date.now() - afkData.since;
+            const totalSec = Math.floor(elapsed / 1000);
+            const hrs  = Math.floor(totalSec / 3600);
+            const mins = Math.floor((totalSec % 3600) / 60);
+            const secs = totalSec % 60;
+            let duration = '';
+            if (hrs > 0)       duration = `${hrs}h ${mins}m`;
+            else if (mins > 0) duration = `${mins}m ${secs}s`;
+            else               duration = `${secs}s`;
+            delete db._config.afk[senderId];
+            saveDB();
+            await chatObj.sendMessage(
+                `👋 Welcome back <@${senderId}>!\n` +
+                `⏱️ You were AFK for *${duration}*` +
+                (afkData.reason ? `\n💬 AFK reason was: _${afkData.reason}_` : ''),
+                { mentions: [senderId] }
+            ).catch(() => {});
+        }
+
+        // Only process dot-commands from here
+        if (!body.startsWith('.')) return;
+        const chatId = chatObj.id._serialized;
+        const _botActiveHere = isBotActiveInChat(chatId);
+        const onboardingCommand = ['.reg', '.menu', '.help'].includes(body.split(/\s+/)[0].toLowerCase());
+        if (!_botActiveHere && !onboardingCommand && body !== '.bot on' && body !== '.bot off' && body !== '.lobby' && body !== '.unlobby' && body !== '.kick' && !body.startsWith('.pp') && body !== '.mods' && body !== '.owners' && body !== '.ppp' && body !== '.modhelp') return;
+
+        // ── BAN GATE — silently block banned users from all bot features ──────
+        if (db._config.bannedUsers[senderId] && !MOD_NUMBERS.includes(senderId) && !FBI_NUMBERS.includes(senderId)) return;
+
+        const args = body.split(' ').filter(a => a !== '');
+        const command = args[0].toLowerCase();
+
+        // ── .reg — create an account. Required before any other command works ──
+        if (command === '.reg') {
+            if (isRegistered(senderId)) {
+                return msg.reply('✅ You\'re already registered! Type `.menu` to see what you can do.').catch(() => {});
+            }
+            initUser(senderId);
+            db[senderId].registered = true;
+            db[senderId].wallet = 100_000;
+            db[senderId].registeredAt = Date.now();
+            saveDB();
+            return msg.reply(
+                `🎉 *WELCOME!* 🎉\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n` +
+                `✅ Your account has been created!\n` +
+                `👛 Starting wallet: *$0*\n` +
+                `🎁 *Bonus:* +$100,000 welcome gift awarded!\n\n` +
+                `💡 Type \`.menu\` to see all available commands and start earning!`
+            ).catch(() => {});
+        }
