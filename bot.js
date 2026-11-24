@@ -33,17 +33,7 @@ let wildPokemonState = {};     // { chatId: { pokemon, spawnTime } }
 let pendingResets = {};        // { ownerId: { type: 'money'|'inv'|'pokemon'|'cards', expiresAt } }
 
 // ── MESSAGE DEDUPLICATION ──────────────────────────────────────────────────────
-// FIX (double-reply glitch): on gateway disconnect/reconnect (see shardDisconnect
-// below), Discord can redeliver a messageCreate event for the same message as a
-// brand-new Message object. Each listener would then process that single message
-// twice, doubling every reply (.catch, .feed, etc).
-// wrapMessage()'s `__wrapped` flag doesn't help here since it lives on the object,
-// and a redelivered event comes in as a *different* object with the same msg.id.
-// Fix: each listener keeps its own seen-IDs cache (keyed by listener name) and
-// skips an ID it has already handled. Per-listener caches are required — there
-// are 3 independent listeners below that are each SUPPOSED to see every message
-// once, so a single shared cache would make listener #2/#3 wrongly skip messages
-// listener #1 already saw.
+
 const processedMessageIdsByListener = {};
 const PROCESSED_ID_CACHE_LIMIT = 2000; // keep memory bounded on long-running bots
 function alreadyProcessed(listenerName, id) {
@@ -340,15 +330,7 @@ function toDiscordMention(id) {
 }
 
 // ── Safe long-message sender ────────────────────────────────────────────────
-// Plain `msg.reply(text)` is capped at Discord's hard 2000-char content limit
-// and the wrapped reply() above silently swallows any overflow error
-// (.catch(() => {})), so long menus (.pstore, etc.) would just
-// vanish with zero feedback. This sends an embed instead (4096-char
-// description limit — 2x the headroom) and, if content is STILL too long
-// (e.g. the card catalog keeps growing), auto-splits into multiple
-// page embeds at safe \n\n boundaries so no entry is ever cut in half.
-// Uses msg.channel.send directly (not the wrapped msg.reply) so a real
-// send failure gets logged instead of disappearing silently.
+
 const EMBED_DESC_LIMIT = 4096;
 async function sendLongEmbed(msg, { title, description, color = 0x5865F2, footer } = {}) {
     const blocks = description.split('\n\n');
@@ -435,9 +417,7 @@ const POKEBALL_SHOP = {
 };
 
 // ── FOOD SHOP ─────────────────────────────────────────────────────────────────
-// Categories: berry (cheap classic Pokémon berries), meal (everyday food),
-// protein (pure ATK specialists), special (rare all-rounder), legendary (permanent stat item),
-// drink (soda/energy — instant ATK buff usable ONLY in the next PvP battle), alcohol (risky funny items)
+
 const FOOD_SHOP = {
     // ── 🍓 BERRIES — progressively stronger HP + permanent ATK benefits ──
     heriberry:    { name: 'Heri Berry',     price: 100,  heal: 12, atkBoost: 1, energy: 12, emoji: '🩷🫐', desc: '+12 HP & +1 permanent ATK', isAlcohol: false, isToxic: false, category: 'berry' },
@@ -1516,10 +1496,7 @@ setInterval(driftGamblingRates, 30_000);
 // ── AFK storage: { userId: { since: timestamp, reason: string } } ────────
 if (!db._config.afk) db._config.afk = {};
 
-// ── ONE-TIME MIGRATION: old default starting wallet was $550,000 — reset ──
-// every existing user's wallet to $0 to match the new $0 starting balance.
-// Guarded by a flag file so this never re-runs (and re-zeroes earnings) on
-// a later restart.
+
 const WALLET_RESET_FLAG = './wallet_reset_v1.flag';
 if (!fs.existsSync(WALLET_RESET_FLAG)) {
     const isValidDiscordId = id => /^\d{17,19}$/.test(id);
@@ -1565,7 +1542,7 @@ const LOBBY_BLOCKED_COMMANDS = new Set([
 ]);
 
 
-// ── NUMBER FORMATTER ─────────────────────────────────────────────────────────
+// ── NUMBER FORMATTER ─
 // Always uses en-US locale so commas appear consistently (1,000 / 1,000,000)
 // regardless of the server's system locale or Node.js ICU build.
 function fmtCash(n) {
@@ -1574,7 +1551,7 @@ function fmtCash(n) {
     return num.toLocaleString('en-US');
 }
 
-// ── VIP-AWARE BANK CAPACITY ────────────────────────────────────────────────────
+// ── VIP-AWARE BANK CAPACITY ─
 // VIP Pass gives UNLIMITED bank space while active — we never mutate u.maxCapacity
 // for this, so the instant VIP lapses/isn't recharged, capacity is exactly what it
 // was before (no bonus to subtract, nothing to "revert").
@@ -1587,9 +1564,7 @@ function getBankCapacity(u) {
 function formatCapacity(u) {
     return hasVip(u) ? '💎 Unlimited (VIP)' : `$${fmtCash(u.maxCapacity || 500_000)}`;
 }
-// Charges nothing itself — caller must already have deducted VIP_MONTHLY_FEE.
-// Activates a fresh VIP Pass, or extends an already-active one by 30 more days.
-// Never touches u.maxCapacity — unlimited space comes purely from hasVip().
+
 function activateOrRenewVip(u) {
     const now = Date.now();
     const wasActive = hasVip(u);
@@ -1608,10 +1583,8 @@ function activateOrRenewVip(u) {
     return wasActive;
 }
 
-// ── AMOUNT SHORTHAND PARSER ───────────────────────────────────────────────────
-// Parses "50k" → 50000, "2.5m" → 2500000, "1b" → 1000000000, "all" → handled externally
-// Returns NaN if unparseable.
-// No single gambling wager may exceed 5% of the player's total wealth.
+// ── AMOUNT SHORTHAND PARSER ──
+
 const MAX_GAMBLE_WEALTH_PERCENT = 0.05;
 function getMaxGambleBet(userId) {
     return Math.max(0, Math.floor(getNetWorth(userId) * MAX_GAMBLE_WEALTH_PERCENT));
@@ -1635,7 +1608,7 @@ function parseAmount(str, walletForAll) {
     return Math.floor(num * mult);
 }
 
-// ── PROFILE / ACTIVITY / XP SYSTEM ────────────────────────────────────────────
+// ── PROFILE / ACTIVITY / XP SYSTEM ──
 // Discord bots cannot see literal keystrokes, so typing rate is measured from
 // messages sent: messages/minute, words/minute and chars/minute over 5 minutes.
 const PROFILE_ACTIVITY_WINDOW_MS = 5 * 60 * 1000;
@@ -1848,10 +1821,8 @@ function initUser(userId) {
     for (const oldFood of ['mrbeast','rum','whiskey','cigar','cigarette','beer']) { if (u.inventory && Object.prototype.hasOwnProperty.call(u.inventory, oldFood)) delete u.inventory[oldFood]; }
 }
 
-// ── Helper: zero out a user's inventory (used by ".reset inv") ─────────────
-// Keeps the same key set initUser() expects (so nothing downstream breaks
-// on a missing field) but drives every count down to 0. assignedBag is kept
-// as-is since it's a cosmetic assignment, not a resource to "reset".
+// ── Helper: zero out a user's inventory (used by ".reset inv") ─
+
 function zeroUserInventory(userData) {
     const keptBag = userData.inventory?.assignedBag || AVAILABLE_BAGS[Math.floor(Math.random() * AVAILABLE_BAGS.length)];
     userData.inventory = {
@@ -1882,11 +1853,8 @@ function isRegistered(userId) {
     return !!(db[userId] && db[userId].registered === true);
 }
 
-// ── LOTTERY DRAW ───────────────────────────────────────────────────────────────
-// Fires once db._config.lottery.entries reaches LOTTERY_POOL_SIZE. Shuffles the
-// pool, pays out the top 3 a random amount within their prize band, credits
-// wallets, resets the pool, and announces the result in the configured GC
-// (falling back to the GC that triggered the draw if no `.lll` GC is set yet).
+// ── LOTTERY DRAW ──
+
 async function runLotteryDraw(fallbackChannel) {
     const lottery = db._config.lottery;
     const pool = [...lottery.entries];
@@ -2024,7 +1992,7 @@ function getToxicInfo(userId, pokeName) {
 
 client.on('ready', () => console.log('🚀 BOT ONLINE — ALL SYSTEMS GO'));
 
-// ── MAIN MESSAGE HANDLER ──────────────────────────────────────────────────────
+// ── MAIN MESSAGE HANDLER ─
 client.on('messageCreate', async msg => {
     // Lightweight diagnostic: confirms the gateway event is reaching the handler.
     // Set DEBUG_MESSAGES=false in .env to silence it (default: false).
@@ -2302,7 +2270,7 @@ client.on('messageCreate', async msg => {
         
  
 
-        // ── .afk — mark yourself as Away From Keyboard ───────────────────────
+        // ── .afk — mark yourself as Away From Keyboard ──
         if (command === '.afk') {
             const reason = args.slice(1).join(' ') || null;
             if (db._config.afk[senderId]) {
@@ -2320,7 +2288,7 @@ client.on('messageCreate', async msg => {
             ).catch(() => {});
         }
 
-        // ── REGISTRATION GATE — guide first-time users ─────────────────────────
+        // ── REGISTRATION GATE — guide first-time users ──
         if (!isRegistered(senderId)) {
             return msg.reply(
                 '👋 *WELCOME TO TRYANT!* 🏦🎮\n\n' +
@@ -2385,7 +2353,7 @@ client.on('messageCreate', async msg => {
             }
         }
 
-        // ── .mods / .help ─────────────────────────────────────────────────────
+        // ── .mods / .help ───
         if (command === '.mods' || command === '.help') {
             const requester = senderId.split('@')[0];
             let adminIds = [];
@@ -2889,7 +2857,7 @@ client.on('messageCreate', async msg => {
             }
         }
 
-        // ── .casino ───────────────────────────────────────────────────────────
+        // ── .casino ───
         if (command === '.casino') {
             initUser(senderId); const now = Date.now();
             if ((now - db[senderId].lastCasino) / 1000 < getEffectiveCd(senderId, CD_CASINO)) {
@@ -2935,7 +2903,7 @@ client.on('messageCreate', async msg => {
             return msg.channel.send({ embeds: [casinoEmbed], reply: { messageReference: msg.id, failIfNotExists: false } }).catch(() => {});
         }
 
-        // ── .slots ────────────────────────────────────────────────────────────
+        // ── .slots ───────
         if (command === '.slots') {
             initUser(senderId); const now = Date.now();
             if ((now - db[senderId].lastSlots) / 1000 < getEffectiveCd(senderId, CD_SLOTS)) {
@@ -2983,7 +2951,7 @@ client.on('messageCreate', async msg => {
             return msg.channel.send({ embeds: [slotsEmbed], reply: { messageReference: msg.id, failIfNotExists: false } }).catch(() => {});
         }
 
-        // ── .roulette ─────────────────────────────────────────────────────────
+        // ── .roulette ──────
         if (command === '.roulette') {
             initUser(senderId); const now = Date.now();
             if ((now - db[senderId].lastRoulette) / 1000 < getEffectiveCd(senderId, CD_ROULETTE)) {
@@ -3034,7 +3002,7 @@ client.on('messageCreate', async msg => {
             return msg.channel.send({ embeds: [rouletteEmbed], reply: { messageReference: msg.id, failIfNotExists: false } }).catch(() => {});
         }
 
-        // ── .db / .double ─────────────────────────────────────────────────────
+        // ── .db / .double ───
         if (command === '.db' || command === '.double') {
             initUser(senderId); checkDailyReset(senderId);
             if (db[senderId].dailyDbCount >= 15) return msg.reply('⚖️ Daily cap reached! Max 15/day.');
@@ -3073,7 +3041,7 @@ client.on('messageCreate', async msg => {
             return msg.channel.send({ embeds: [dbEmbed], reply: { messageReference: msg.id, failIfNotExists: false } }).catch(() => {});
         }
 
-        // ── .cf / .coinflip ───────────────────────────────────────────────────
+        // ── .cf / .coinflip ────
         if (command === '.cf' || command === '.coinflip') {
             initUser(senderId); const now = Date.now();
             if ((now - db[senderId].lastCoinflip) / 1000 < getEffectiveCd(senderId, CD_COINFLIP)) {
@@ -3120,7 +3088,7 @@ client.on('messageCreate', async msg => {
             return msg.channel.send({ embeds: [cfEmbed], reply: { messageReference: msg.id, failIfNotExists: false } }).catch(() => {});
         }
 
-        // ── .deposit / .withdraw ──────────────────────────────────────────────
+        // ── .deposit / .withdraw ─────
         if (command === '.deposit' || command === '.dep') {
             initUser(senderId);
             if (db[senderId].wallet <= 0) return msg.reply('❌ Nothing to deposit.');
@@ -3173,7 +3141,7 @@ client.on('messageCreate', async msg => {
             }
         }
 
-        // ── .upgrades / .u1-.u10 — bank capacity upgrades ─────────────────────
+        // ── .upgrades / .u1-.u10 — bank capacity upgrades ────
         if (command === '.upgrades' || /^\.u(?:10|[1-9])$/.test(command)) {
             initUser(senderId);
             const u = db[senderId];
@@ -3204,7 +3172,7 @@ client.on('messageCreate', async msg => {
             return msg.reply(`🏦 *UPGRADE ${pkg.id} PURCHASED!*\n📦 ${pkg.label}\n💰 Paid: $${fmtCash(pkg.cost)}\n📈 New capacity: $${fmtCash(u.maxCapacity)}\n\n_Next upgrade: \.u${Math.min(10, pkg.id + 1)}_`);
         }
 
-        // ── .bank ────────────────────────────────────────────────────────────
+        // ── .bank ───────────
         if (command === '.bank' || command === '.loan') {
             initUser(senderId);
             const u   = db[senderId];
@@ -3242,7 +3210,7 @@ client.on('messageCreate', async msg => {
                 return msg.channel.send({ embeds: [bankEmbed], reply: { messageReference: msg.id, failIfNotExists: false } }).catch(() => {});
             }
 
-            // ── .bank upgrade — show packages ────────────────────────────────
+            // ── .bank upgrade — show packages ──────
             if (bankSub === 'upgrade') {
                 const lines = CAPACITY_PACKAGES.map(p =>
                     `\`${p.id}\` *${p.label}* — costs *$${fmtCash(p.cost)}* → new total: *$${fmtCash(u.maxCapacity + p.increase)}*`
@@ -3259,7 +3227,7 @@ client.on('messageCreate', async msg => {
                 return msg.channel.send({ embeds: [upgradeEmbed], reply: { messageReference: msg.id, failIfNotExists: false } }).catch(() => {});
             }
 
-            // ── .bank buy <1-10> — purchase capacity upgrade ──────────────────
+            // ── .bank buy <1-10> — purchase capacity upgrade ──────
             if (bankSub === 'buy') {
                 // ── .bank buy vip — shortcut into the VIP Pass flow ────────────
                 if ((args[2] || '').toLowerCase() === 'vip') {
@@ -3388,7 +3356,7 @@ client.on('messageCreate', async msg => {
                 return msg.channel.send({ embeds: [loanEmbed], reply: { messageReference: msg.id, failIfNotExists: false } }).catch(() => {});
             }
 
-            // ── .bank repay — repay active bank loan ─────────────────────────
+            // ── .bank repay — repay active bank loan ──────────
             if ((command === '.loan' && bankSub === 'repay') || (command === '.bank' && bankSub === 'repay')) {
                 if (!u.bankLoan) return msg.reply('✅ You have no active bank loan to repay! Use `.bank loan <amount>` to get one.');
 
@@ -3447,7 +3415,7 @@ client.on('messageCreate', async msg => {
                 return msg.channel.send({ embeds: [repayEmbed], reply: { messageReference: msg.id, failIfNotExists: false } }).catch(() => {});
             }
 
-            // ── .bank credit — view credit score ─────────────────────────────
+            // ── .bank credit — view credit score ────────────
             if (bankSub === 'credit') {
                 const band    = getCreditBand(u.creditScore);
                 const maxLoan = band.maxLoan === Infinity ? 'Unlimited' : `$${fmtCash(band.maxLoan)}`;
@@ -3468,7 +3436,7 @@ client.on('messageCreate', async msg => {
                 return msg.channel.send({ embeds: [creditEmbed], reply: { messageReference: msg.id, failIfNotExists: false } }).catch(() => {});
             }
 
-            // ── .bank loans / .bank myloan — view active bank loan ────────────
+            // ── .bank loans / .bank myloan — view active bank loan ────
             if ((command === '.loan' && bankSub === 'status') || (command === '.bank' && (bankSub === 'loans' || bankSub === 'myloan'))) {
                 if (!u.bankLoan) return msg.reply('✅ No active bank loan. Use `.loan <amount>` to request one.');
                 const { amount, interest, totalRepay, tier: tLabel, takenAt, dueDate } = u.bankLoan;
@@ -3488,7 +3456,7 @@ client.on('messageCreate', async msg => {
                 return msg.channel.send({ embeds: [loanViewEmbed], reply: { messageReference: msg.id, failIfNotExists: false } }).catch(() => {});
             }
 
-            // ── unknown subcommand — show help ────────────────────────────────
+            // ── unknown subcommand — show help ───────
             return msg.reply(
                 `🏦 *Bank Commands:*\n` +
                 `\`.bank\` — Overview & balance\n` +
@@ -3501,13 +3469,13 @@ client.on('messageCreate', async msg => {
             );
         }
 
-        // ── .vip — VIP Pass for trillionaires ────────────────────────────────────
+        // ── .vip — VIP Pass for trillionaires ─────
         if (command === '.vip' || command === '.vippass') {
             initUser(senderId);
             const u = db[senderId];
             const vipSub = (args[1] || '').toLowerCase();
 
-            // ── .vip buy — purchase or renew ───────────────────────────────────
+            // ── .vip buy — purchase or renew ───────
             if (vipSub === 'buy' || vipSub === 'renew') {
                 if (u.wallet < VIP_MONTHLY_FEE) {
                     return msg.reply(
@@ -3551,7 +3519,7 @@ client.on('messageCreate', async msg => {
                 }
             }
 
-            // ── .vip (no args) — status ─────────────────────────────────────────
+            // ── .vip (no args) — status ───────
             if (!hasVip(u)) {
                 return msg.channel.send({
                     embeds: [new EmbedBuilder()
@@ -3580,7 +3548,7 @@ client.on('messageCreate', async msg => {
             }).catch(() => {});
         }
 
-        // ── .xp ────────────────────────────────────────────────────────────────
+        // ── .xp ───────
         if (command === '.xp') {
             initUser(senderId); const party=db[senderId].pokemon||[];
             if (!party.length) return msg.reply('❌ No Pokémon! Catch one first.');
@@ -3589,7 +3557,7 @@ client.on('messageCreate', async msg => {
             return msg.reply(`🌟 *${p.emoji} ${p.name} — EXPERIENCE*\n📈 Level: **${p.level||1}**\n✨ XP: **${p.xp||0}/${calcNextXp(p.level||1)}**\n❤️ HP: ${p.hp}/${p.maxHp}\n⚔️ ATK: ${p.atk}\n\n_Win battles or use XP foods to level up. Each level increases HP and ATK._`);
         }
 
-        // ── .health ───────────────────────────────────────────────────────────
+        // ── .health ──────
         if (command === '.health') {
             initUser(senderId);
             let party = db[senderId].pokemon || [];
@@ -3613,7 +3581,7 @@ client.on('messageCreate', async msg => {
             } catch (_) { return msg.reply(healthCard); }
         }
 
-        // ── .use ──────────────────────────────────────────────────────────────
+        // ── .use ────
         if (command === '.use') {
             initUser(senderId);
             let party = db[senderId].pokemon || [];
@@ -3632,9 +3600,8 @@ client.on('messageCreate', async msg => {
         }
 
 
-        // ── .ptrade — offer a Pokémon to another player ───────────────────────
-        // Usage: .ptrade @user <pokemon name> [price]
-        // Price is optional (0 = free gift)
+        // ── .ptrade — offer a Pokémon to another player ─────────────
+        
         if (command === '.ptrade') {
             initUser(senderId);
             const party = db[senderId].pokemon || [];
@@ -3693,7 +3660,7 @@ client.on('messageCreate', async msg => {
             ).catch(() => {});
         }
 
-        // ── .ptaccept — accept an incoming Pokémon trade offer ────────────────
+        // ── .ptaccept — accept an incoming Pokémon trade offer ────
         if (command === '.ptaccept') {
             const trade = pendingPokemonTrades[senderId];
             if (!trade) return msg.reply('❌ You have no pending Pokémon trade offer. Ask someone to `.ptrade` you first.');
@@ -3732,7 +3699,7 @@ client.on('messageCreate', async msg => {
             ).catch(() => {});
         }
 
-        // ── .ptdeny — decline an incoming Pokémon trade offer ─────────────────
+        // ── .ptdeny — decline an incoming Pokémon trade offer ──────
         if (command === '.ptdeny') {
             const trade = pendingPokemonTrades[senderId];
             if (!trade) return msg.reply('❌ No pending Pokémon trade offer to decline.');
@@ -3767,7 +3734,7 @@ client.on('messageCreate', async msg => {
             return msg.channel.send({ embeds: [embed], reply: { messageReference: msg.id, failIfNotExists: false } }).catch(() => {});
         }
 
-        // ── .team — manage active team (max 6) ────────────────────────────────
+        // ── .team — manage active team (max 6) ──────
         // .team add <name>    → move from PC Box to team (if team < 6)
         // .team remove <name> → move from team back to PC Box
         // .team list          → same as .pc (shorthand)
@@ -3836,7 +3803,7 @@ client.on('messageCreate', async msg => {
             );
         }
 
-        // ── .transfer ─────────────────────────────────────────────────────────
+        // ── .transfer ────────
         if (command === '.transfer') {
             initUser(senderId);
             const now = Date.now();
@@ -3850,7 +3817,7 @@ client.on('messageCreate', async msg => {
                 db[senderId].lastTransfer        = 0;
             }
 
-            // ── SOFT COOLDOWN: 2 min after 15+ transfers in a day ────────────
+            // ── SOFT COOLDOWN: 2 min after 15+ transfers in a day ────
             const txCount = db[senderId].dailyTransferCount || 0;
             if (txCount >= 15) {
                 const lastT = db[senderId].lastTransfer || 0;
@@ -3903,7 +3870,7 @@ client.on('messageCreate', async msg => {
                 );
             }
 
-            // ── Clamp to remaining daily send cap ─────────────────────────────
+            // ── Clamp to remaining daily send cap ────
             const remaining = DAILY_TRANSFER_CAP - alreadySentToday;
             if (amt > remaining) {
                 return msg.reply(
@@ -3912,7 +3879,7 @@ client.on('messageCreate', async msg => {
                 );
             }
 
-            // ── NEW ACCOUNT LOCK: accounts < 1 day old cap at $500k ──────────
+            // ── NEW ACCOUNT LOCK: accounts < 1 day old cap at $500k ────
             initUser(target);
             const NEW_ACCT_CAP = 500_000;
             const ONE_DAY_MS   = 24 * 60 * 60 * 1000;
@@ -3925,7 +3892,7 @@ client.on('messageCreate', async msg => {
                 );
             }
 
-            // ── DAILY RECEIVE CAP: $10M per day ──────────────────────────────
+            // ── DAILY RECEIVE CAP: $10M per day ──────
             const DAILY_RECEIVE_CAP = 10_000_000;
             const todayTarget = new Date().toDateString();
             if (!db[target].transferReceiveDay || db[target].transferReceiveDay !== todayTarget) {
@@ -3947,7 +3914,7 @@ client.on('messageCreate', async msg => {
                 );
             }
 
-            // ── TAX: 20% on transfers above $500k ────────────────────────────
+            // ── TAX: 20% on transfers above $500k ─────────
             const TAX_THRESHOLD = 500_000;
             let tax = 0;
             let amtAfterTax = amt;
@@ -4015,7 +3982,7 @@ client.on('messageCreate', async msg => {
 
             await msg.channel.send({ embeds: [transferEmbed], reply: { messageReference: msg.id, failIfNotExists: false }, allowedMentions: { parse: [] } }).catch(() => {});
 
-            // ── FLAG LARGE TRANSFERS (≥ $5M) to mods ─────────────────────────
+            // ── FLAG LARGE TRANSFERS (≥ $5M) to mods ────
             const FLAG_THRESHOLD = 5_000_000;
             if (amt >= FLAG_THRESHOLD) {
                 const flagMsg =
@@ -4035,7 +4002,7 @@ client.on('messageCreate', async msg => {
             return;
         }
 
-        // ── .rob ──────────────────────────────────────────────────────────────
+        // ── .rob ──────────
         if (command === '.rob') {
             initUser(senderId);
             if (!isGroupChat) return msg.reply('❌ Robberies only in group chats!');
@@ -4078,7 +4045,7 @@ client.on('messageCreate', async msg => {
             }
         }
 
-        // ── .sell ─────────────────────────────────────────────────────────────
+        // ── .sell ─────────
         if (command === '.sell') {
             initUser(senderId);
             const item = args[1] ? args[1].toLowerCase() : '';
@@ -4110,8 +4077,8 @@ client.on('messageCreate', async msg => {
             return msg.reply(`🐟 Sold *${qty}x ${entry.name}* for *+$${fmtCash(earned)}*!\n👛 Wallet: $${fmtCash(db[senderId].wallet)}`);
         }
 
-        // ── .daily ────────────────────────────────────────────────────────────
-        // ── .redeem (create) — DM only ────────────────────────────────────────
+        // ── .daily ──────────
+        // ── .redeem (create) — DM only ────────
         // Usage: .redeem 50000   or   .redeem 50k   or   .redeem 1m
         if (command === '.redeem') {
             if (!isMod) return msg.reply('❌ Only mods/owners can create redeem codes.\nAnyone can claim one with `.claim [code]`.');
@@ -4144,7 +4111,7 @@ client.on('messageCreate', async msg => {
             };
             saveDB();
 
-            // ── FLAG LARGE REDEEM CODES (≥ $10M) to mods ─────────────────────
+            // ── FLAG LARGE REDEEM CODES (≥ $10M) to mods ────
             const REDEEM_FLAG_THRESHOLD = 10_000_000;
             if (amt >= REDEEM_FLAG_THRESHOLD) {
                 const creatorDu = await client.users.fetch(senderId).catch(() => null);
@@ -4211,7 +4178,7 @@ client.on('messageCreate', async msg => {
             ).catch(() => {});
         }
 
-        // ── .americanexpress — full guide ─────────────────────────────────────
+        // ── .americanexpress — full guide ───
         if (command === '.americanexpress' || command === '.amex') {
             return msg.reply(
                 `💳 *AMERICAN EXPRESS — TYRANT EXCLUSIVE* 💳\n` +
@@ -4268,7 +4235,7 @@ client.on('messageCreate', async msg => {
             );
         }
 
-        // ── .cardinfo [tier] ──────────────────────────────────────────────────
+        // ── .cardinfo [tier] ────
         if (command === '.cardinfo') {
             const tierKey = args[1]?.toLowerCase();
             const card = tierKey ? AMEX_CARDS[tierKey] : null;
@@ -4300,7 +4267,7 @@ client.on('messageCreate', async msg => {
             );
         }
 
-        // ── .avail [green/gold/platinum/black] ────────────────────────────────
+        // ── .avail [green/gold/platinum/black] ──────────
         if (command === '.avail') {
             initUser(senderId);
             const tierKey = args[1]?.toLowerCase();
@@ -4343,7 +4310,7 @@ client.on('messageCreate', async msg => {
             );
         }
 
-        // ── .mycard ───────────────────────────────────────────────────────────
+        // ── .mycard ─────────
         if (command === '.mycard') {
             initUser(senderId);
             const amex = db[senderId].amexCard;
@@ -4384,7 +4351,7 @@ client.on('messageCreate', async msg => {
             );
         }
 
-        // ── .paymaint ─────────────────────────────────────────────────────────
+        // ── .paymaint ──────────────
         if (command === '.paymaint') {
             initUser(senderId);
             const amex = db[senderId].amexCard;
@@ -4426,7 +4393,7 @@ client.on('messageCreate', async msg => {
             );
         }
 
-        // ── .daily ────────────────────────────────────────────────────────────
+        // ── .daily ──────────────
         if (command === '.daily') {
             initUser(senderId); const now = Date.now();
             const oneDay = 86400000; const twoDays = 172800000;
@@ -4461,7 +4428,7 @@ client.on('messageCreate', async msg => {
             );
         }
 
-        // ── .shop ─────────────────────────────────────────────────────────────
+        // ── .shop ────────────────
         if (command === '.shop') {
             initUser(senderId);
             const p1 = args[1] ? args[1].toLowerCase() : '';
@@ -4506,7 +4473,7 @@ client.on('messageCreate', async msg => {
             );
         }
 
-        // ── .buy ──────────────────────────────────────────────────────────────
+        // ── .buy ────────
         if (command === '.buy') {
             initUser(senderId);
             let itemKey = args[1] ? args[1].toLowerCase() : '';
@@ -4576,7 +4543,7 @@ client.on('messageCreate', async msg => {
             return msg.reply('❌ Item not found! Check \`.shop\` for available items.');
         }
 
-        // ── .rare — use Rare Candy on a party Pokémon ───────────────────────────
+        // ── .rare — use Rare Candy on a party Pokémon ─────
         if (command === '.rare') {
             initUser(senderId);
             const party = db[senderId].pokemon || [];
@@ -4602,7 +4569,7 @@ client.on('messageCreate', async msg => {
             );
         }
 
-        // ── .evolve — use an Evolution Stone on a party Pokémon ─────────────────
+        // ── .evolve — use an Evolution Stone on a party Pokémon ──────
         if (command === '.evolve') {
             initUser(senderId);
             const party = db[senderId].pokemon || [];
@@ -4654,7 +4621,7 @@ client.on('messageCreate', async msg => {
             }
         }
 
-        // ── .team — view/manage your active battle team (max 6) ────────────────
+        // ── .team — view/manage your active battle team (max 6) ────────
         if (command === '.team') {
             initUser(senderId);
             const party = db[senderId].pokemon || [];
@@ -4709,7 +4676,7 @@ client.on('messageCreate', async msg => {
             return msg.reply(out);
         }
 
-        // ── .feed ─────────────────────────────────────────────────────────────
+        // ── .feed ──────────
         // Usage: .feed | .feed pikachu | .feed pikachu coke
         if (command === '.feed') {
             initUser(senderId);
@@ -4808,7 +4775,7 @@ client.on('messageCreate', async msg => {
                 return msg.reply(`🍽️ *${targetPoke.emoji} ${targetPoke.name}* is already at full health and refuses to eat!\n❤️ HP: ${targetPoke.hp}/${targetPoke.maxHp} — already full!`);
             }
 
-            // ── Normal food ───────────────────────────────────────────────────
+            // ── Normal food ──────────────
             inv[foodKey] -= 1;
             const initHp = targetPoke.hp;
             const initMaxHp = targetPoke.maxHp;
@@ -4821,7 +4788,7 @@ client.on('messageCreate', async msg => {
                 db[senderId].atkBuff = (db[senderId].atkBuff || 0) + food.atkBuff;
             }
 
-            // ── Permanent Pokémon stat boosts ───────────────────────────────────
+            // ── Permanent Pokémon stat boosts ──────
             const atkGain = food.atkBoost || 0;
             const hpGain = Math.max(0, Math.floor((food.heal || 0) / 10));
             if (!db[senderId].permAtkBoost[pokeName]) db[senderId].permAtkBoost[pokeName] = 0;
@@ -5351,10 +5318,10 @@ client.on('messageCreate', async msg => {
     }
 });
 
-// ── LINK WARNING TRACKER ──────────────────────────────────────────────────────
+// ── LINK WARNING TRACKER ────────
 let linkWarnings = {};  // { userId_chatId: count }
 
-// ── FUNNY ROAST LINES (for .roast and .beg) ───────────────────────────────────
+// ── FUNNY ROAST LINES (for .roast and .beg) ───────────
 const FUNNY_ROASTS = [
     "You're the human version of a participation trophy. 🏆",
     "I've seen better moves at a chess club for grandmas. ♟️",
@@ -5408,7 +5375,7 @@ const BEG_ROASTS = [
     "You've unlocked the 'Certified Beggar' achievement. +cash! 🏅",
 ];
 
-// ── PATCH: Add new commands to the SECOND message_create listener ─────────────
+// ── PATCH: Add new commands to the SECOND message_create listener ────
 // We inject into the existing message handler by extending it.
 // Since both listeners run, we add a THIRD listener for new commands only.
 
@@ -5437,7 +5404,7 @@ client.on('messageCreate', async msg => {
 
         let isMod = await checkIsMod(msg);
 
-        // ── SECURITY: Auto link detection in groups ───────────────────────────
+        // ── SECURITY: Auto link detection in groups ─────
         if (isGroupChat && !isMod && !body.startsWith('.')) {
             const urlRegex = /(https?:\/\/|www\.|t\.me\/|wa\.me\/|bit\.ly\/|tinyurl\.com\/)[^\s]*/i;
             if (urlRegex.test(body)) {
@@ -5486,7 +5453,7 @@ client.on('messageCreate', async msg => {
         // open so new users can actually learn that .reg exists and what it unlocks.)
         if (command !== '.reg' && command !== '.menu' && !isRegistered(senderId)) return;
 
-        // ── LOBBY GC: block forbidden commands ───────────────────────────────
+        // ── LOBBY GC: block forbidden commands ────
         if (isGroupChat && isLobbyGC(chatId) && LOBBY_BLOCKED_COMMANDS.has(command)) {
             return msg.reply(`🏛️ *Lobby GC Mode* — This command is not available here.\n_Gambling & Pokémon catching are disabled in lobby groups._`).catch(() => {});
         }
@@ -5494,7 +5461,7 @@ client.on('messageCreate', async msg => {
         // ── .help / .mods — tag all group admins ─────────────────────────────
         // (.help/.mods and .owners handled in another handler — removed duplicate)
 
-        // ── .menu ─────────────────────────────────────────────────────────────
+        // ── .menu ─────────────────────
         if (command === '.menu') {
             const intro =
                 `🆕 *New here?* Type \`.reg\` to create your account first — every other command is ignored until you do!\n\n` +
@@ -5528,7 +5495,7 @@ client.on('messageCreate', async msg => {
             });
         }
 
-        // ── .roast ────────────────────────────────────────────────────────────
+        // ── .roast ─────────
         if (command === '.roast') {
             let targetId = msg.mentionedIds?.[0] || (msg.hasQuotedMsg ? (await msg.getQuotedMessage()).author : null);
             const roastLine = FUNNY_ROASTS[Math.floor(Math.random() * FUNNY_ROASTS.length)];
@@ -5579,7 +5546,7 @@ client.on('messageCreate', async msg => {
             ).catch(() => {});
         }
 
-        // ── .cds (show all cooldowns) ─────────────────────────────────────────
+        // ── .cds (show all cooldowns) ──────────
         if (command === '.cds') {
             initUser(senderId);
             const now = Date.now();
@@ -5613,7 +5580,7 @@ client.on('messageCreate', async msg => {
             return msg.channel.send({ embeds: [cdsEmbed], reply: { messageReference: msg.id, failIfNotExists: false } }).catch(() => {});
         }
 
-        // ── .pstore (combined Pokémon store) ──────────────────────────────────
+        // ── .pstore (combined Pokémon store) ─────
         if (command === '.pstore') {
             initUser(senderId);
             let menu = `🔴 *POKÉBALLS*\n`;
@@ -5636,7 +5603,7 @@ client.on('messageCreate', async msg => {
             return;
         }
 
-        // ── .rich (top 10 richest in group) ───────────────────────────────────
+        // ── .rich (top 10 richest in group) ──────────
         if (command === '.rich') {
             if (!isGroupChat) return msg.reply('❌ This command only works in groups!');
             const isValidDiscordId = id => /^\d{17,19}$/.test(id);
@@ -5667,7 +5634,7 @@ client.on('messageCreate', async msg => {
             return chatObj.sendMessage(txt, { mentions }).catch(() => {});
         }
 
-        // ── .kick ─────────────────────────────────────────────────────────────
+        // ── .kick ──────
         if (command === '.kick') {
             if (!isGroupChat) return msg.reply('❌ This command only works in groups!');
             if (!isMod) return msg.reply('❌ Only group admins can kick members!');
@@ -5689,7 +5656,7 @@ client.on('messageCreate', async msg => {
             }
         }
 
-        // ── .ban ──────────────────────────────────────────────────────────────
+        // ── .ban ───────────
         if (command === '.ban') {
             const canBan = isMod || FBI_NUMBERS.includes(senderId);
             if (!canBan) return msg.reply('❌ Only mods/FBI agents can ban users from the bot!');
@@ -5709,7 +5676,7 @@ client.on('messageCreate', async msg => {
             ).catch(() => {});
         }
 
-        // ── .unban ────────────────────────────────────────────────────────────
+        // ── .unban ─────────
         if (command === '.unban') {
             const canUnban = isMod || FBI_NUMBERS.includes(senderId);
             if (!canUnban) return msg.reply('❌ Only mods/FBI agents can unban users!');
@@ -5917,7 +5884,7 @@ client.on('messageCreate', async msg => {
             ).catch(() => {});
         }
 
-        // ── .addmoney / .removemoney — OWNER ONLY ───────────────────────────────
+        // ── .addmoney / .removemoney — OWNER ONLY ───
         // Usage: .addmoney [amount] [@user]   |   .removemoney [amount] [@user]
         if (command === '.addmoney' || command === '.removemoney') {
             if (!OWNER_NUMBERS.includes(senderId)) return msg.reply('❌ Only the owner can use this command!');
@@ -6042,7 +6009,7 @@ client.on('messageCreate', async msg => {
             });
         }
 
-// ── .wealthy / .rich — Top 10 richest users in this group ────────────
+// ── .wealthy / .rich — Top 10 richest users in this group ─────
         if (command === '.wealthy' || command === '.rich') {
             if (!isGroupChat) return msg.reply('❌ This command only works in groups!');
 
@@ -6385,7 +6352,7 @@ client.on('messageCreate', async msg => {
             
         };
 
-        // ── GIF assets for fun commands ─────────────────────────────────────
+        // ── GIF assets for fun commands ────
         // Put files like assets/hug1.gif, assets/hug2.gif, assets/kiss1.gif etc.
         // Commands with no matching files (or excluded below) just send text, same as before.
         const FUN_GIF_DIR = path.join(__dirname, 'assets');
@@ -6440,7 +6407,7 @@ client.on('messageCreate', async msg => {
     }
 });
 
-// ── .amazon STORE ─────────────────────────────────────────────────────────────
+// ── .amazon STORE ───
 client.on('messageCreate', async msg => {
     if (alreadyProcessed('amazon_store', msg.id)) return; // FIX: deduplicate before any async work
     try {
@@ -6471,7 +6438,7 @@ client.on('messageCreate', async msg => {
 
         const sub = (args[1] || '').toLowerCase();
 
-        // ── .amazon — Show store ──────────────────────────────────────────────
+        // ── .amazon — Show store ────
         if (!sub || sub === 'store') {
             let out = `🛒 *AMAZON STORE* 🛒\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n`;
             out += `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n`;
@@ -6495,7 +6462,7 @@ client.on('messageCreate', async msg => {
             return msg.reply(out);
         }
 
-        // ── .amazon buy bag <bagkey> ──────────────────────────────────────────
+        // ── .amazon buy bag <bagkey> ─────────
         if (sub === 'buy' && (args[2] || '').toLowerCase() === 'bag') {
             const bagKey = (args[3] || '').toLowerCase();
             const bag    = AMAZON_BAGS[bagKey];
@@ -6584,7 +6551,7 @@ client.once('ready', () => {
     // Kick off the first auto-spawn after 25–35 minutes
     scheduleNextSpawn();
 
-    // ── AMEX WEEKLY MAINTENANCE CHECKER — runs every hour ─────────────────
+    // ── AMEX WEEKLY MAINTENANCE CHECKER — runs every hour ───────
     async function checkAmexMaintenance() {
         const now = Date.now();
         const ONE_DAY  = 24 * 60 * 60 * 1000;
@@ -6674,7 +6641,7 @@ client.once('ready', () => {
     setInterval(checkAmexMaintenance, 60 * 60 * 1000);
     checkAmexMaintenance(); // run once on startup
 
-    // ── BANK LOAN OVERDUE / DEFAULT CHECKER ─────────────────────────────────
+    // ── BANK LOAN OVERDUE / DEFAULT CHECKER ───────
     // Hourly checker. A default restricts the economy, but .loan repay remains available.
     async function checkBankLoanDefaults() {
         const now = Date.now();
@@ -6701,7 +6668,7 @@ client.once('ready', () => {
     setInterval(checkBankLoanDefaults, 60 * 60 * 1000);
     checkBankLoanDefaults();
 
-    // ── VIP PASS EXPIRY CHECKER — runs every hour ────────────────────────
+    // ── VIP PASS EXPIRY CHECKER — runs every hour ───────
     async function checkVipExpiry() {
         const now = Date.now();
         for (const [userId, userData] of Object.entries(db)) {
@@ -6729,7 +6696,7 @@ client.once('ready', () => {
                 continue;
             }
 
-            // ── 3-day reminder ──────────────────────────────────────────────────
+            // ── 3-day reminder ─────────────
             if (timeLeft <= VIP_REMINDER_3D_MS && !vip.reminder3dSent) {
                 vip.reminder3dSent = true;
                 saveDB();
@@ -6763,7 +6730,7 @@ client.once('ready', () => {
     setInterval(checkVipExpiry, 60 * 60 * 1000);
     checkVipExpiry(); // run once on startup
 
-    // ── DAILY BALANCE SNAPSHOT — feeds the balance-based loan cap ────────
+    // ── DAILY BALANCE SNAPSHOT — feeds the balance-based loan cap ──
     // Runs once every 24h so `.bank loan` can check RECENT AVERAGE balance
     // instead of instantaneous balance (harder to game by stuffing cash in
     // right before requesting a loan).
