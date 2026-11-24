@@ -30,7 +30,6 @@ let pendingBattles = {};       // { targetId: { challengerId, challengerName, de
 let pendingPokemonTrades = {}; // { targetId: { fromId, fromName, pokemon, price } }
 let activeBattles = {};        // { battleId: { p1, p2, p1Id, p2Id, turn, log, wildMode, wildPokemon } }
 let wildPokemonState = {};     // { chatId: { pokemon, spawnTime } }
-let messageCounters = {};      // { chatId: count }
 let pendingResets = {};        // { ownerId: { type: 'money'|'inv'|'pokemon'|'cards', expiresAt } }
 
 // ── MESSAGE DEDUPLICATION ──────────────────────────────────────────────────────
@@ -86,7 +85,7 @@ const FBI_NUMBERS = [
 // ── Helper: split a tax amount equally among all owners, crediting their wallets ──
 // Any leftover from integer division (rounding remainder) goes to the first owner(s)
 // so the full tax amount is always accounted for (nothing lost to rounding).
-function distributeTaxToOwners(taxAmt) {
+function splitOwnerTax(taxAmt) {
     if (!taxAmt || taxAmt <= 0 || OWNER_NUMBERS.length === 0) return;
     const share = Math.floor(taxAmt / OWNER_NUMBERS.length);
     let remainder = taxAmt - (share * OWNER_NUMBERS.length);
@@ -221,11 +220,11 @@ async function checkAmexInvite(userId) {
                 `Congratulations! Your net worth has qualified you for the\n` +
                 `*Amex ${card.name} Card* — one of Tyrant's most exclusive memberships.\n\n` +
                 `💳 *Card:* Amex ${card.emoji} ${card.name}\n` +
-                `💰 *One-time fee:* $${formatNum(card.availCost)}\n` +
-                `📅 *Weekly maintenance:* $${formatNum(card.maintenance)}/week\n\n` +
+                `💰 *One-time fee:* $${fmtCash(card.availCost)}\n` +
+                `📅 *Weekly maintenance:* $${fmtCash(card.maintenance)}/week\n\n` +
                 `✨ *Benefits:*\n` +
-                `📤 Transfer limit: ${card.transferLimit === Infinity ? 'Unlimited' : '$' + formatNum(card.transferLimit)}\n` +
-                `📊 Daily transfer cap: ${card.dailyTransferCap === Infinity ? 'None' : '$' + formatNum(card.dailyTransferCap)}\n` +
+                `📤 Transfer limit: ${card.transferLimit === Infinity ? 'Unlimited' : '$' + fmtCash(card.transferLimit)}\n` +
+                `📊 Daily transfer cap: ${card.dailyTransferCap === Infinity ? 'None' : '$' + fmtCash(card.dailyTransferCap)}\n` +
                 `⏱️ Gambling CD: -${card.cdReduction * 100}%\n` +
                 `🎁 Daily bonus: +${card.dailyBonus * 100}%\n` +
                 `🛡️ Rob protection: ${card.robProtection === 0 ? 'None' : card.robProtection === 1 ? 'Full immunity' : (card.robProtection * 100) + '% damage reduction'}\n` +
@@ -497,7 +496,7 @@ function buildFoodShopMenu() {
         menu += `${CATEGORY_LABELS[cat]}\n`;
         for (const key of keys) {
             const f = FOOD_SHOP[key];
-            menu += `${f.emoji} *${f.name}* — $${formatNum(f.price)} (\`.buy ${key}\`)\n📝 ${f.desc}\n\n`;
+            menu += `${f.emoji} *${f.name}* — $${fmtCash(f.price)} (\`.buy ${key}\`)\n📝 ${f.desc}\n\n`;
         }
     }
     return menu.trim();
@@ -884,7 +883,7 @@ const DEFAULT_MOVES = [
     { name: 'Quick Hit', damage: [25, 40], emoji: '💨', special: false },
 ];
 
-function xpRequiredForLevel(level) {
+function calcNextXp(level) {
     const lv = Math.max(1, Number(level) || 1);
     return Math.floor(100 * Math.pow(1.25, lv - 1));
 }
@@ -893,19 +892,19 @@ function addPokemonXp(pokemon, amount) {
     const gained = Math.max(0, Math.floor(Number(amount) || 0));
     const oldLevel = Math.max(1, Number(pokemon.level) || 1);
     pokemon.level = oldLevel; pokemon.xp = Math.max(0, Number(pokemon.xp) || 0);
-    pokemon.maxXp = xpRequiredForLevel(pokemon.level);
+    pokemon.maxXp = calcNextXp(pokemon.level);
     pokemon.xp += gained; let levels = 0;
     while (pokemon.xp >= pokemon.maxXp) {
         pokemon.xp -= pokemon.maxXp; pokemon.level += 1; levels += 1;
         const hpGain = Math.max(3, Math.floor((pokemon.maxHp || 50) * 0.06));
         const atkGain = Math.max(2, Math.floor((pokemon.atk || 50) * 0.05));
         pokemon.maxHp = (pokemon.maxHp || 50) + hpGain; pokemon.hp = Math.min(pokemon.maxHp, (pokemon.hp || 0) + hpGain); pokemon.atk = (pokemon.atk || 50) + atkGain;
-        pokemon.maxXp = xpRequiredForLevel(pokemon.level);
+        pokemon.maxXp = calcNextXp(pokemon.level);
     }
     return { gained, levels, oldLevel, newLevel: pokemon.level };
 }
 function xpForWildPokemon(wild) { return ({ Weak:20, Common:35, Rare:60, Epic:90, Legendary:140, Mythical:180 })[wild?.rarity] || 30; }
-function getPokemonXpLine(pokemon) { const lv=Math.max(1,Number(pokemon?.level)||1), xp=Math.max(0,Number(pokemon?.xp)||0); return `Lv.${lv} • XP ${xp}/${xpRequiredForLevel(lv)}`; }
+function getPokemonXpLine(pokemon) { const lv=Math.max(1,Number(pokemon?.level)||1), xp=Math.max(0,Number(pokemon?.xp)||0); return `Lv.${lv} • XP ${xp}/${calcNextXp(lv)}`; }
 
 function getMovesForPokemon(pokeName) {
     return POKEMON_MOVES[pokeName.toLowerCase()] || DEFAULT_MOVES;
@@ -1394,7 +1393,7 @@ const GAMBLING_RATE_RANGES = {
     double:      [33, 33],
 };
 function clampRate(v, range) { return Math.max(range[0], Math.min(range[1], Number(v))); }
-function ensureDynamicGamblingRates() {
+function syncHouseOdds() {
     if (!db._config.gamblingRates) db._config.gamblingRates = {};
     for (const [key, range] of Object.entries(GAMBLING_RATE_RANGES)) {
         if (!Number.isFinite(Number(db._config.gamblingRates[key]))) {
@@ -1404,12 +1403,12 @@ function ensureDynamicGamblingRates() {
     return db._config.gamblingRates;
 }
 function getDynamicGamblingRate(game) {
-    const rates = ensureDynamicGamblingRates();
+    const rates = syncHouseOdds();
     const range = GAMBLING_RATE_RANGES[game];
     return clampRate(rates[game], range);
 }
 function driftGamblingRates() {
-    const rates = ensureDynamicGamblingRates();
+    const rates = syncHouseOdds();
     for (const [key, range] of Object.entries(GAMBLING_RATE_RANGES)) {
         // Mostly small downward movement, with frequent small recoveries.
         const delta = Math.random() < 0.62 ? -(0.05 + Math.random() * 0.20) : (0.01 + Math.random() * 0.10);
@@ -1511,7 +1510,7 @@ if (db._config.lottery.announceChannelId === undefined) db._config.lottery.annou
 if (db._config.lottery.lastResult === undefined)        db._config.lottery.lastResult = null;
 
 // Start the live gambling-rate market after the database has been loaded.
-ensureDynamicGamblingRates();
+syncHouseOdds();
 setInterval(driftGamblingRates, 30_000);
 
 // ── AFK storage: { userId: { since: timestamp, reason: string } } ────────
@@ -1569,7 +1568,7 @@ const LOBBY_BLOCKED_COMMANDS = new Set([
 // ── NUMBER FORMATTER ─────────────────────────────────────────────────────────
 // Always uses en-US locale so commas appear consistently (1,000 / 1,000,000)
 // regardless of the server's system locale or Node.js ICU build.
-function formatNum(n) {
+function fmtCash(n) {
     const num = Number(n);
     if (!isFinite(num)) return String(n);
     return num.toLocaleString('en-US');
@@ -1579,21 +1578,21 @@ function formatNum(n) {
 // VIP Pass gives UNLIMITED bank space while active — we never mutate u.maxCapacity
 // for this, so the instant VIP lapses/isn't recharged, capacity is exactly what it
 // was before (no bonus to subtract, nothing to "revert").
-function isVipActive(u) {
+function hasVip(u) {
     return !!(u && u.vip && u.vip.active && u.vip.expiresAt > Date.now());
 }
 function getBankCapacity(u) {
-    return isVipActive(u) ? Infinity : (u.maxCapacity || 500_000);
+    return hasVip(u) ? Infinity : (u.maxCapacity || 500_000);
 }
 function formatCapacity(u) {
-    return isVipActive(u) ? '💎 Unlimited (VIP)' : `$${formatNum(u.maxCapacity || 500_000)}`;
+    return hasVip(u) ? '💎 Unlimited (VIP)' : `$${fmtCash(u.maxCapacity || 500_000)}`;
 }
 // Charges nothing itself — caller must already have deducted VIP_MONTHLY_FEE.
 // Activates a fresh VIP Pass, or extends an already-active one by 30 more days.
-// Never touches u.maxCapacity — unlimited space comes purely from isVipActive().
+// Never touches u.maxCapacity — unlimited space comes purely from hasVip().
 function activateOrRenewVip(u) {
     const now = Date.now();
-    const wasActive = isVipActive(u);
+    const wasActive = hasVip(u);
     if (wasActive) {
         u.vip.expiresAt += VIP_DURATION_MS;
         u.vip.reminder3dSent = false;
@@ -1665,7 +1664,7 @@ function profileLevelForXp(totalXp) {
     while (remaining >= need && level < 100) { remaining -= need; level++; need = profileXpRequired(level); }
     return { level, currentXp: remaining, needed: need };
 }
-function grantProfileLevelReward(u, level) {
+function giveRankBonus(u, level) {
     const reward = PROFILE_LEVEL_REWARDS[level];
     if (!reward) return null;
     u.wallet = (u.wallet || 0) + (reward.cash || 0);
@@ -1708,7 +1707,7 @@ function awardProfileXp(userId, amount, reason = 'interaction') {
     const rewards = [];
     if (after.level > before.level) {
         for (let lv = before.level + 1; lv <= after.level; lv++) {
-            const reward = grantProfileLevelReward(u, lv);
+            const reward = giveRankBonus(u, lv);
             if (reward) rewards.push({ level: lv, reward });
         }
     }
@@ -1824,7 +1823,7 @@ function initUser(userId) {
     if (u.amexCard === undefined)         u.amexCard = null;
     if (u.amexInvitesSent === undefined)  u.amexInvitesSent = {};
     if (u.pokemon === undefined) u.pokemon = [];
-    for (const p of u.pokemon) { p.level=p.level||1; p.xp=p.xp||0; p.maxXp=p.maxXp||xpRequiredForLevel(p.level); }
+    for (const p of u.pokemon) { p.level=p.level||1; p.xp=p.xp||0; p.maxXp=p.maxXp||calcNextXp(p.level); }
     // Active battle team — names of up to 6 Pokémon from u.pokemon. Everything else lives in the PC (box).
     if (u.team === undefined) u.team = u.pokemon.slice(0, 6).map(p => p.name);
     // mrbeast daily usage per pokemon: { pokemonName: { count, lastReset } }
@@ -1917,7 +1916,7 @@ async function runLotteryDraw(fallbackChannel) {
     let out = `🎰 *LOTTERY DRAW COMPLETE!* 🎰\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n`;
     out += `🎟️ 5 tickets sold — here are the results:\n\n`;
     winners.forEach(w => {
-        out += `${w.label}: <@${w.userId}> — *+$${formatNum(w.amount)}* 💰\n`;
+        out += `${w.label}: <@${w.userId}> — *+$${fmtCash(w.amount)}* 💰\n`;
     });
     if (losers.length) {
         out += `\n💀 *No prize:* ${losers.map(id => `<@${id}>`).join(', ')}\n`;
@@ -1956,7 +1955,7 @@ function checkDailyReset(userId) {
     }
 }
 
-function makeProgressBar(current, max) {
+function renderHpBar(current, max) {
     const total = 8;
     const filled = Math.max(0, Math.min(total, Math.round((current / max) * total)));
     return '🟩'.repeat(filled) + '⬜'.repeat(total - filled);
@@ -2021,8 +2020,8 @@ function getToxicInfo(userId, pokeName) {
     return db[userId]?.toxicity?.[pokeName.toLowerCase()] || { alcoholCount: 0, cigarCount: 0, toxicUntil: 0 };
 }
 
-// ── CLIENT EVENTS ─────────────────────────────────────────────────────────────
-client.on('qr', qr => { qrcode.generate(qr, { small: true }); console.log('👉 Scan QR:'); });
+// ── CLIENT EVENTS ─────
+
 client.on('ready', () => console.log('🚀 BOT ONLINE — ALL SYSTEMS GO'));
 
 // ── MAIN MESSAGE HANDLER ──────────────────────────────────────────────────────
@@ -2151,7 +2150,7 @@ client.on('messageCreate', async msg => {
 
             let moveMsg = `⚔️ *${myPoke.emoji} ${myPoke.name}* used *${chosenMove.emoji} ${chosenMove.name}*!\n` +
                           `💥 Dealt *${dmg} damage* to ${oppPoke.emoji} ${oppPoke.name}!\n` +
-                          `❤️ ${oppPoke.name} HP: ${makeProgressBar(oppPoke.hp, oppPoke.maxHp)} (${oppPoke.hp}/${oppPoke.maxHp})\n`;
+                          `❤️ ${oppPoke.name} HP: ${renderHpBar(oppPoke.hp, oppPoke.maxHp)} (${oppPoke.hp}/${oppPoke.maxHp})\n`;
 
             if (oppPoke.hp <= 0) {
                 // Battle over
@@ -2218,7 +2217,7 @@ client.on('messageCreate', async msg => {
 
                 moveMsg += `\n🟢 *${battle.p2.emoji} ${battle.p2.name}* used *${wildMove.emoji} ${wildMove.name}*!\n` +
                            `💥 Dealt *${wDmg} damage* to ${battle.p1.emoji} ${battle.p1.name}!\n` +
-                           `❤️ ${battle.p1.name} HP: ${makeProgressBar(battle.p1.hp, battle.p1.maxHp)} (${battle.p1.hp}/${battle.p1.maxHp})\n`;
+                           `❤️ ${battle.p1.name} HP: ${renderHpBar(battle.p1.hp, battle.p1.maxHp)} (${battle.p1.hp}/${battle.p1.maxHp})\n`;
 
                 if (battle.p1.hp <= 0) {
                     // Player's Pokémon fainted — battle over, wild Pokémon gets away
@@ -2452,7 +2451,7 @@ client.on('messageCreate', async msg => {
 
         // ── .gamble ───────────────────────────────────────────────────────────
         if (command === '.gamble') {
-            const r = ensureDynamicGamblingRates();
+            const r = syncHouseOdds();
             return msg.reply(
                 `🎰 *CASINO DISTRICT — GAMBLING GUIDE* 🎰
 ` +
@@ -2534,7 +2533,7 @@ client.on('messageCreate', async msg => {
             if (entrantNames.length > 0) {
                 out += entrantNames.map((name, i) => `   ${i + 1}. ${name}`).join('\n') + '\n';
             }
-            out += `\n🎟️ *Ticket price:* $${formatNum(LOTTERY_TICKET_PRICE)}\n`;
+            out += `\n🎟️ *Ticket price:* $${fmtCash(LOTTERY_TICKET_PRICE)}\n`;
             out += entries.includes(senderId)
                 ? `✅ You're entered this round!\n`
                 : `❌ You haven't entered — buy a ticket with \`.buy lottery\`\n`;
@@ -2561,7 +2560,7 @@ client.on('messageCreate', async msg => {
                             if (mem) wName = mem.nickname || mem.displayName || wName;
                         }
                     } catch (_) {}
-                    out += `   ${w.label}: ${wName} (+$${formatNum(w.amount)})\n`;
+                    out += `   ${w.label}: ${wName} (+$${fmtCash(w.amount)})\n`;
                 }
             }
             return chatObj.sendMessage(out, { allowedMentions: { parse: [] } }).catch(() => {});
@@ -2598,7 +2597,7 @@ client.on('messageCreate', async msg => {
                 else { db._config.botActive = true; }
                 saveDB();
                 return msg.reply('🟢 Bot active in *this* group.');
-            } else return msg.reply('❌ Usage:  or ');
+            } else return msg.reply('❌ Usage: .bot onor.bot off');
         }
 
         // ── .lobby — mark/unmark this GC as a lobby ──────────────────────────
@@ -2680,7 +2679,7 @@ client.on('messageCreate', async msg => {
             initUser(target); const u = db[target];
             const netW = (u.wallet || 0) + (u.bank || 0);
             const capacity = getBankCapacity(u);
-            const bankPct = isVipActive(u) ? 0 : Math.min(100, Number((((u.bank || 0) / Math.max(1, capacity)) * 100).toFixed(1)));
+            const bankPct = hasVip(u) ? 0 : Math.min(100, Number((((u.bank || 0) / Math.max(1, capacity)) * 100).toFixed(1)));
             let displayName = target, avatarUrl = null;
             try {
                 const du = await client.users.fetch(target).catch(() => null);
@@ -2692,9 +2691,9 @@ client.on('messageCreate', async msg => {
                 .setAuthor({ name: displayName + "'s Balance", iconURL: avatarUrl || undefined })
                 .setThumbnail(avatarUrl)
                 .addFields(
-                    { name: '💰 Wallet', value: '`$' + formatNum(u.wallet || 0) + '`', inline: true },
-                    { name: '🏦 Bank', value: '`$' + formatNum(u.bank || 0) + '`', inline: true },
-                    { name: '📊 Net Worth', value: '`$' + formatNum(netW) + '`', inline: true },
+                    { name: '💰 Wallet', value: '`$' + fmtCash(u.wallet || 0) + '`', inline: true },
+                    { name: '🏦 Bank', value: '`$' + fmtCash(u.bank || 0) + '`', inline: true },
+                    { name: '📊 Net Worth', value: '`$' + fmtCash(netW) + '`', inline: true },
                     { name: '🏦 Bank Capacity', value: bankPct + '% used', inline: true },
                     { name: '🏅 Civil Score', value: '`' + (u.creditScore || 500) + '/1000` ' + getCreditBand(u.creditScore || 500).label, inline: true },
                 )
@@ -2751,8 +2750,8 @@ client.on('messageCreate', async msg => {
                     .setTitle('🎁 TREASURE BOX FOUND!')
                     .setDescription(
                         `🏆 **INCREDIBLE!** You unearthed a **TRYANT Treasure Box**!\n\n` +
-                        `💰 **Gold Coins** › \`+$${formatNum(treasureWin)}\`\n` +
-                        `👛 **Wallet** › \`$${formatNum(db[senderId].wallet)}\``
+                        `💰 **Gold Coins** › \`+$${fmtCash(treasureWin)}\`\n` +
+                        `👛 **Wallet** › \`$${fmtCash(db[senderId].wallet)}\``
                     )
                     .setThumbnail('attachment://treasure_box.png')
                     .setFooter({ text: 'Rare find! Only 2% chance!' });
@@ -2772,7 +2771,7 @@ client.on('messageCreate', async msg => {
                 const digLossEmbed = new EmbedBuilder()
                     .setColor(0xE74C3C)
                     .setTitle('⛏️ Dig')
-                    .setDescription(`🧟 A zombie jumped out!\n**Lost** › \`-$${formatNum(loss)}\`\n**Wallet** › \`$${formatNum(db[senderId].wallet)}\``)
+                    .setDescription(`🧟 A zombie jumped out!\n**Lost** › \`-$${fmtCash(loss)}\`\n**Wallet** › \`$${fmtCash(db[senderId].wallet)}\``)
                     .setThumbnail('attachment://zombie.png');
                 try {
                     return await msg.channel.send({
@@ -2797,9 +2796,9 @@ client.on('messageCreate', async msg => {
                     .setColor(0xF1C40F)
                     .setTitle('💰 You caught coins!')
                     .setDescription(
-                        `You dug and found **${formatNum(coins)} coins**!\n\n` +
-                        `💰 **Gained** › \`+$${formatNum(coins)}\`\n` +
-                        `👛 **Wallet** › \`$${formatNum(db[senderId].wallet)}\``
+                        `You dug and found **${fmtCash(coins)} coins**!\n\n` +
+                        `💰 **Gained** › \`+$${fmtCash(coins)}\`\n` +
+                        `👛 **Wallet** › \`$${fmtCash(db[senderId].wallet)}\``
                     )
                     .setThumbnail('attachment://coin.png')
                     .setFooter({ text: 'Keep digging for more!' });
@@ -2844,7 +2843,7 @@ client.on('messageCreate', async msg => {
                 const fishSharkEmbed = new EmbedBuilder()
                     .setColor(0xE74C3C)
                     .setTitle('🎣 Fishing')
-                    .setDescription(`🦈 **SHARK ATTACK!**\n**Lost** › \`-$${formatNum(loss)}\`\n**Wallet** › \`$${formatNum(db[senderId].wallet)}\``)
+                    .setDescription(`🦈 **SHARK ATTACK!**\n**Lost** › \`-$${fmtCash(loss)}\`\n**Wallet** › \`$${fmtCash(db[senderId].wallet)}\``)
                     .setThumbnail('attachment://shark.png');
                 try {
                     return await msg.channel.send({
@@ -2900,7 +2899,7 @@ client.on('messageCreate', async msg => {
             let bet = parseAmount(args[1]);
             const gambleCheck = validateGambleBet(senderId, bet);
             if (!gambleCheck.ok) return msg.reply(gambleCheck.reason === 'wealth'
-                ? `❌ Max wager is 5% of your total wealth: $${formatNum(gambleCheck.maxBet)}.`
+                ? `❌ Max wager is 5% of your total wealth: $${fmtCash(gambleCheck.maxBet)}.`
                 : '❌ Enter a real bet you own.');
             db[senderId].lastCasino = now;
             const syms = ['🎲','🎰','💎','🃏','💰'];
@@ -2924,13 +2923,13 @@ client.on('messageCreate', async msg => {
                     `## [ ${r1} | ${r2} | ${r3} ]
 
 ` +
-                    `**Bet** › \`$${formatNum(bet)}\`
+                    `**Bet** › \`$${fmtCash(bet)}\`
 ` +
                     `**Win Rate** › \`${casinoWinChance.toFixed(0)}%\`
 ` +
-                    `**Result** › ${won_c ? `🎉 You won \`$${formatNum(payout)}\` (2.4×)!` : `💀 You lost \`$${formatNum(bet)}\``}
+                    `**Result** › ${won_c ? `🎉 You won \`$${fmtCash(payout)}\` (2.4×)!` : `💀 You lost \`$${fmtCash(bet)}\``}
 ` +
-                    `**Wallet** › \`$${formatNum(db[senderId].wallet)}\``
+                    `**Wallet** › \`$${fmtCash(db[senderId].wallet)}\``
                 )
                 .setFooter({ text: won_c ? '🔥 Lucky spin!' : '😤 Better luck next time' });
             return msg.channel.send({ embeds: [casinoEmbed], reply: { messageReference: msg.id, failIfNotExists: false } }).catch(() => {});
@@ -2946,7 +2945,7 @@ client.on('messageCreate', async msg => {
             let bet = parseAmount(args[1]);
             const gambleCheck = validateGambleBet(senderId, bet);
             if (!gambleCheck.ok) return msg.reply(gambleCheck.reason === 'wealth'
-                ? `❌ Max wager is 5% of your total wealth: $${formatNum(gambleCheck.maxBet)}.`
+                ? `❌ Max wager is 5% of your total wealth: $${fmtCash(gambleCheck.maxBet)}.`
                 : '❌ Usage: `.slots [bet]`');
             db[senderId].lastSlots = now;
             const items = ['🍎','💎','🍓','🍒','🔔'];
@@ -2972,13 +2971,13 @@ client.on('messageCreate', async msg => {
                     `## [ ${r1}  |  ${r2}  |  ${r3} ]
 
 ` +
-                    `**Bet** › \`$${formatNum(bet)}\`
+                    `**Bet** › \`$${fmtCash(bet)}\`
 ` +
                     `**Win Rate** › \`${slotsWinChance.toFixed(0)}%\`
 ` +
-                    `**Result** › ${won ? `🎉 **JACKPOT!** +$${formatNum(payout)} (2.5×)` : `❌ **No Match** — **-$${formatNum(bet)}**`}
+                    `**Result** › ${won ? `🎉 **JACKPOT!** +$${fmtCash(payout)} (2.5×)` : `❌ **No Match** — **-$${fmtCash(bet)}**`}
 ` +
-                    `**Wallet** › \`$${formatNum(db[senderId].wallet)}\``
+                    `**Wallet** › \`$${fmtCash(db[senderId].wallet)}\``
                 )
                 .setFooter({ text: won ? '🏆 2.5× payout!' : '😬 Spin again?' });
             return msg.channel.send({ embeds: [slotsEmbed], reply: { messageReference: msg.id, failIfNotExists: false } }).catch(() => {});
@@ -2996,7 +2995,7 @@ client.on('messageCreate', async msg => {
             const gambleCheck = validateGambleBet(senderId, bet);
             if (!['red','black','green'].includes(space) || !gambleCheck.ok)
                 return msg.reply(gambleCheck.reason === 'wealth'
-                    ? `❌ Max wager is 5% of your total wealth: $${formatNum(gambleCheck.maxBet)}.`
+                    ? `❌ Max wager is 5% of your total wealth: $${fmtCash(gambleCheck.maxBet)}.`
                     : '❌ Format: `.roulette [red/black/green] [bet]`');
             db[senderId].lastRoulette = now;
 
@@ -3022,14 +3021,14 @@ client.on('messageCreate', async msg => {
                 .setDescription(
                     `**Ball landed on** › ${colorEmoji} **${rollNum}** (${landedColor})
 ` +
-                    `**Your bet** › ${betEmoji} ${space} · \`$${formatNum(bet)}\`
+                    `**Your bet** › ${betEmoji} ${space} · \`$${fmtCash(bet)}\`
 ` +
                     `**Win Rate** › \`${rouletteWinChance.toFixed(0)}%\` · **Payout** › 1.9×
 
 ` +
-                    `**Result** › ${won_r ? `🎉 You won \`$${formatNum(payout)}\`!` : `💀 You lost \`$${formatNum(bet)}\``}
+                    `**Result** › ${won_r ? `🎉 You won \`$${fmtCash(payout)}\`!` : `💀 You lost \`$${fmtCash(bet)}\``}
 ` +
-                    `**Wallet** › \`$${formatNum(db[senderId].wallet)}\``
+                    `**Wallet** › \`$${fmtCash(db[senderId].wallet)}\``
                 )
                 .setFooter({ text: '🎯 1.9× payout' });
             return msg.channel.send({ embeds: [rouletteEmbed], reply: { messageReference: msg.id, failIfNotExists: false } }).catch(() => {});
@@ -3047,7 +3046,7 @@ client.on('messageCreate', async msg => {
             const bet = parseAmount(args[1]);
             const gambleCheck = validateGambleBet(senderId, bet);
             if (!gambleCheck.ok) return msg.reply(gambleCheck.reason === 'wealth'
-                ? `❌ Max wager is 5% of your total wealth: $${formatNum(gambleCheck.maxBet)}.`
+                ? `❌ Max wager is 5% of your total wealth: $${fmtCash(gambleCheck.maxBet)}.`
                 : '❌ Invalid bet.');
             db[senderId].lastDb = now; db[senderId].dailyDbCount += 1;
 
@@ -3062,11 +3061,11 @@ client.on('messageCreate', async msg => {
                 .setColor(won ? 0x2ECC71 : 0xE74C3C)
                 .setTitle('📈 Double or Nothing')
                 .setDescription(
-                    `**Result** › ${won ? `🟢 **WON!** +$${formatNum(payout)} (1.9×)` : `🔴 **CRASHED!** -$${formatNum(bet)}`}
+                    `**Result** › ${won ? `🟢 **WON!** +$${fmtCash(payout)} (1.9×)` : `🔴 **CRASHED!** -$${fmtCash(bet)}`}
 ` +
                     `**Win Rate** › \`${dbWinChance.toFixed(0)}%\`
 ` +
-                    `**Wallet** › \`$${formatNum(db[senderId].wallet)}\`
+                    `**Wallet** › \`$${fmtCash(db[senderId].wallet)}\`
 ` +
                     `**Uses today** › ${db[senderId].dailyDbCount}/15`
                 )
@@ -3086,7 +3085,7 @@ client.on('messageCreate', async msg => {
             const gambleCheck = validateGambleBet(senderId, bet);
             if (!['h','t','heads','tails'].includes(userChoice) || !gambleCheck.ok)
                 return msg.reply(gambleCheck.reason === 'wealth'
-                    ? `❌ Max wager is 5% of your total wealth: $${formatNum(gambleCheck.maxBet)}.`
+                    ? `❌ Max wager is 5% of your total wealth: $${fmtCash(gambleCheck.maxBet)}.`
                     : '❌ Syntax: `.cf [heads/tails] [bet]`');
             db[senderId].lastCoinflip = now;
             const choiceMap = { h:'heads', t:'tails', heads:'heads', tails:'tails' };
@@ -3108,14 +3107,14 @@ client.on('messageCreate', async msg => {
 ` +
                     `**Your pick** › ${pick}
 ` +
-                    `**Bet** › \`$${formatNum(bet)}\`
+                    `**Bet** › \`$${fmtCash(bet)}\`
 ` +
                     `**Win Rate** › \`${cfWinChance.toFixed(0)}%\` · **Payout** › 1.9×
 
 ` +
-                    `**Result** › ${won ? `🎉 You won \`$${formatNum(payout)}\`!` : `💀 You lost \`$${formatNum(bet)}\``}
+                    `**Result** › ${won ? `🎉 You won \`$${fmtCash(payout)}\`!` : `💀 You lost \`$${fmtCash(bet)}\``}
 ` +
-                    `**Wallet** › \`$${formatNum(db[senderId].wallet)}\``
+                    `**Wallet** › \`$${fmtCash(db[senderId].wallet)}\``
                 )
                 .setFooter({ text: won ? '🔥 1.9× payout!' : '😤 Flip it again' });
             return msg.channel.send({ embeds: [cfEmbed], reply: { messageReference: msg.id, failIfNotExists: false } }).catch(() => {});
@@ -3131,16 +3130,16 @@ client.on('messageCreate', async msg => {
             if (isNaN(amt) || amt <= 0 || amt > db[senderId].wallet) return msg.reply('❌ Invalid amount.');
             if (amt > bankSpace) {
                 amt = bankSpace;
-                await msg.reply(`⚠️ Bank almost full — only depositing *$${formatNum(amt)}* (remaining space). Buy more capacity with \`.bank buy <1-10>\`.`).catch(() => {});
+                await msg.reply(`⚠️ Bank almost full — only depositing *$${fmtCash(amt)}* (remaining space). Buy more capacity with \`.bank buy <1-10>\`.`).catch(() => {});
             }
             db[senderId].wallet -= amt; db[senderId].bank += amt; saveDB();
             const depEmbed = new EmbedBuilder()
                 .setColor(0x2ECC71)
                 .setTitle('🏦 Deposit Successful')
                 .addFields(
-                    { name: '✅ Deposited', value: `\`+${formatNum(amt)}\``, inline: true },
-                    { name: '💰 Wallet', value: `\`${formatNum(db[senderId].wallet)}\``, inline: true },
-                    { name: '🏦 Bank', value: `\`${formatNum(db[senderId].bank)}\``, inline: true },
+                    { name: '✅ Deposited', value: `\`+${fmtCash(amt)}\``, inline: true },
+                    { name: '💰 Wallet', value: `\`${fmtCash(db[senderId].wallet)}\``, inline: true },
+                    { name: '🏦 Bank', value: `\`${fmtCash(db[senderId].bank)}\``, inline: true },
                 )
                 .setThumbnail('attachment://deposit.png')
                 .setFooter({ text: 'Use .wd to withdraw funds' });
@@ -3161,9 +3160,9 @@ client.on('messageCreate', async msg => {
                 .setColor(0xE67E22)
                 .setTitle('🏧 Withdrawal Successful')
                 .addFields(
-                    { name: '✅ Withdrawn', value: `\`+${formatNum(amt)}\``, inline: true },
-                    { name: '💰 Wallet', value: `\`${formatNum(db[senderId].wallet)}\``, inline: true },
-                    { name: '🏦 Bank', value: `\`${formatNum(db[senderId].bank)}\``, inline: true },
+                    { name: '✅ Withdrawn', value: `\`+${fmtCash(amt)}\``, inline: true },
+                    { name: '💰 Wallet', value: `\`${fmtCash(db[senderId].wallet)}\``, inline: true },
+                    { name: '🏦 Bank', value: `\`${fmtCash(db[senderId].bank)}\``, inline: true },
                 )
                 .setThumbnail('attachment://withdraw.png')
                 .setFooter({ text: 'Use .dep to deposit funds back • Spend wisely!' });
@@ -3181,9 +3180,9 @@ client.on('messageCreate', async msg => {
             const directId = command === '.upgrades' ? null : parseInt(command.slice(2), 10);
             if (directId === null) {
                 const lines = CAPACITY_PACKAGES.map(p =>
-                    `\`${p.id}\` *${p.label}* — costs *$${formatNum(p.cost)}* → new total: *$${formatNum(u.maxCapacity + p.increase)}* → buy with \.u${p.id}`
+                    `\`${p.id}\` *${p.label}* — costs *$${fmtCash(p.cost)}* → new total: *$${fmtCash(u.maxCapacity + p.increase)}* → buy with \.u${p.id}`
                 ).join('\n');
-                const vipLine = isVipActive(u)
+                const vipLine = hasVip(u)
                     ? `💎 VIP active — bank space is UNLIMITED until <t:${Math.floor(u.vip.expiresAt / 1000)}:R>`
                     : `💎 VIP — \.vip buy for unlimited bank space`;
                 return msg.channel.send({ embeds: [new EmbedBuilder().setColor(0x9B59B6).setTitle('🏦 Bank Capacity Upgrades').setDescription(`Current capacity: **${formatCapacity(u)}**\n\n${lines}\n\n${vipLine}`).setFooter({ text: 'Type .u1 through .u10 to buy an upgrade' })], reply: { messageReference: msg.id, failIfNotExists: false } }).catch(() => {});
@@ -3191,7 +3190,7 @@ client.on('messageCreate', async msg => {
             const pkg = CAPACITY_PACKAGES.find(p => p.id === directId);
             if (!pkg) return msg.reply('❌ Invalid upgrade. Use `.upgrades`.');
             const totalFunds = (u.wallet || 0) + (u.bank || 0);
-            if (totalFunds < pkg.cost) return msg.reply(`❌ Need *$${formatNum(pkg.cost)}* but you only have *$${formatNum(totalFunds)}*.`);
+            if (totalFunds < pkg.cost) return msg.reply(`❌ Need *$${fmtCash(pkg.cost)}* but you only have *$${fmtCash(totalFunds)}*.`);
             if (!u.firstUpgradeGuideShown) {
                 u.firstUpgradeGuideShown = true;
                 saveDB();
@@ -3202,7 +3201,7 @@ client.on('messageCreate', async msg => {
             else { rem -= u.wallet; u.wallet = 0; u.bank = Math.max(0, u.bank - rem); }
             u.maxCapacity += pkg.increase;
             saveDB();
-            return msg.reply(`🏦 *UPGRADE ${pkg.id} PURCHASED!*\n📦 ${pkg.label}\n💰 Paid: $${formatNum(pkg.cost)}\n📈 New capacity: $${formatNum(u.maxCapacity)}\n\n_Next upgrade: \.u${Math.min(10, pkg.id + 1)}_`);
+            return msg.reply(`🏦 *UPGRADE ${pkg.id} PURCHASED!*\n📦 ${pkg.label}\n💰 Paid: $${fmtCash(pkg.cost)}\n📈 New capacity: $${fmtCash(u.maxCapacity)}\n\n_Next upgrade: \.u${Math.min(10, pkg.id + 1)}_`);
         }
 
         // ── .bank ────────────────────────────────────────────────────────────
@@ -3224,18 +3223,18 @@ client.on('messageCreate', async msg => {
 
             if (command === '.bank' && (!bankSub || bankSub === 'info')) {
                 const band     = getCreditBand(u.creditScore);
-                const vipOn    = isVipActive(u);
+                const vipOn    = hasVip(u);
                 const bankPct  = vipOn ? 0 : Math.min(100, Number((((Number(u.bank) || 0) / Math.max(1, Number(u.maxCapacity) || BANK_DEFAULT_CAPACITY)) * 100).toFixed(1)));
                 const loanLine = u.bankLoan
-                    ? `⚠️ Active bank loan: *$${formatNum(u.bankLoan.totalRepay)}* due <t:${Math.floor(u.bankLoan.dueDate / 1000)}:R>`
+                    ? `⚠️ Active bank loan: *$${fmtCash(u.bankLoan.totalRepay)}* due <t:${Math.floor(u.bankLoan.dueDate / 1000)}:R>`
                     : `✅ No active bank loan`;
                 const bankEmbed = new EmbedBuilder()
                     .setColor(0x3498DB)
                     .setTitle('🏦 Bank Overview')
                     .addFields(
                         { name: '💰 Balance',    value: vipOn
-                            ? `\`$${formatNum(u.bank)}\` / 💎 *Unlimited (VIP active — expires <t:${Math.floor(u.vip.expiresAt / 1000)}:R>)*`
-                            : `\`$${formatNum(u.bank)}\` / \`$${formatNum(u.maxCapacity)}\` (${bankPct}% used)` },
+                            ? `\`$${fmtCash(u.bank)}\` / 💎 *Unlimited (VIP active — expires <t:${Math.floor(u.vip.expiresAt / 1000)}:R>)*`
+                            : `\`$${fmtCash(u.bank)}\` / \`$${fmtCash(u.maxCapacity)}\` (${bankPct}% used)` },
                         { name: '📊 Credit Score', value: `\`${u.creditScore} / 1000\` ${band.label}`, inline: true },
                         { name: '🏦 Bank Loan',    value: loanLine, inline: true },
                     )
@@ -3246,12 +3245,12 @@ client.on('messageCreate', async msg => {
             // ── .bank upgrade — show packages ────────────────────────────────
             if (bankSub === 'upgrade') {
                 const lines = CAPACITY_PACKAGES.map(p =>
-                    `\`${p.id}\` *${p.label}* — costs *$${formatNum(p.cost)}* → new total: *$${formatNum(u.maxCapacity + p.increase)}*`
+                    `\`${p.id}\` *${p.label}* — costs *$${fmtCash(p.cost)}* → new total: *$${fmtCash(u.maxCapacity + p.increase)}*`
                 ).join('\n');
-                const vipActive = isVipActive(u);
+                const vipActive = hasVip(u);
                 const vipLine = vipActive
-                    ? `\`VIP\` 💎 *VIP Pass* — active! Bank space is *UNLIMITED* right now. Recharge: \`.vip buy\` ($${formatNum(VIP_MONTHLY_FEE)}/mo) before <t:${Math.floor(u.vip.expiresAt / 1000)}:R>`
-                    : `\`VIP\` 💎 *VIP Pass — for trillionaires* — costs *$${formatNum(VIP_MONTHLY_FEE)}/month* → *UNLIMITED* bank space while active\n     ⚠️ _Recurring — miss a recharge and your bank capacity goes back to exactly what it was before (\`$${formatNum(u.maxCapacity)}\` right now)._`;
+                    ? `\`VIP\` 💎 *VIP Pass* — active! Bank space is *UNLIMITED* right now. Recharge: \`.vip buy\` ($${fmtCash(VIP_MONTHLY_FEE)}/mo) before <t:${Math.floor(u.vip.expiresAt / 1000)}:R>`
+                    : `\`VIP\` 💎 *VIP Pass — for trillionaires* — costs *$${fmtCash(VIP_MONTHLY_FEE)}/month* → *UNLIMITED* bank space while active\n     ⚠️ _Recurring — miss a recharge and your bank capacity goes back to exactly what it was before (\`$${fmtCash(u.maxCapacity)}\` right now)._`;
                 const upgradeEmbed = new EmbedBuilder()
                     .setColor(0x9B59B6)
                     .setTitle('🏦 Bank Capacity Upgrades')
@@ -3266,8 +3265,8 @@ client.on('messageCreate', async msg => {
                 if ((args[2] || '').toLowerCase() === 'vip') {
                     if (u.wallet < VIP_MONTHLY_FEE) {
                         return msg.reply(
-                            `❌ *VIP Pass costs $${formatNum(VIP_MONTHLY_FEE)}/month.*\n` +
-                            `👛 You only have *$${formatNum(u.wallet)}*.\n\n` +
+                            `❌ *VIP Pass costs $${fmtCash(VIP_MONTHLY_FEE)}/month.*\n` +
+                            `👛 You only have *$${fmtCash(u.wallet)}*.\n\n` +
                             `_This pass is built for trillionaires — keep stacking!_`
                         );
                     }
@@ -3281,8 +3280,8 @@ client.on('messageCreate', async msg => {
                             .setDescription(
                                 `🏦 *Bank Capacity:* 💎 *UNLIMITED*\n` +
                                 `⏳ *Expires:* <t:${Math.floor(u.vip.expiresAt / 1000)}:F> (<t:${Math.floor(u.vip.expiresAt / 1000)}:R>)\n` +
-                                `💵 *Fee Paid:* $${formatNum(VIP_MONTHLY_FEE)}\n\n` +
-                                `_Recharge with \`.bank buy vip\` or \`.vip buy\` before it expires, or your bank goes back to \`$${formatNum(u.maxCapacity)}\`!_`
+                                `💵 *Fee Paid:* $${fmtCash(VIP_MONTHLY_FEE)}\n\n` +
+                                `_Recharge with \`.bank buy vip\` or \`.vip buy\` before it expires, or your bank goes back to \`$${fmtCash(u.maxCapacity)}\`!_`
                             )],
                         reply: { messageReference: msg.id, failIfNotExists: false }
                     }).catch(() => {});
@@ -3299,7 +3298,7 @@ client.on('messageCreate', async msg => {
                 const totalFunds = u.wallet + u.bank;
                 if (totalFunds < pkg.cost) {
                     return msg.reply(
-                        `❌ Need *$${formatNum(pkg.cost)}* but you only have *$${formatNum(totalFunds)}* (wallet + bank combined).`
+                        `❌ Need *$${fmtCash(pkg.cost)}* but you only have *$${fmtCash(totalFunds)}* (wallet + bank combined).`
                     );
                 }
                 // Deduct: wallet first, then bank
@@ -3313,8 +3312,8 @@ client.on('messageCreate', async msg => {
                     .setTitle('🏦 Capacity Upgraded!')
                     .addFields(
                         { name: '📦 Package',      value: `*${pkg.label}*`,                    inline: true },
-                        { name: '💰 Cost Paid',    value: `\`$${formatNum(pkg.cost)}\``,       inline: true },
-                        { name: '📈 New Capacity', value: `\`$${formatNum(u.maxCapacity)}\``,  inline: true },
+                        { name: '💰 Cost Paid',    value: `\`$${fmtCash(pkg.cost)}\``,       inline: true },
+                        { name: '📈 New Capacity', value: `\`$${fmtCash(u.maxCapacity)}\``,  inline: true },
                     );
                 return msg.channel.send({ embeds: [buyEmbed], reply: { messageReference: msg.id, failIfNotExists: false } }).catch(() => {});
             }
@@ -3322,7 +3321,7 @@ client.on('messageCreate', async msg => {
             // ── .bank loan <amount> — request a bank loan (no card needed) ──────
             if (command === '.loan' || bankSub === 'loan') {
                 if (u.bankLoan) {
-                    return msg.reply(`⚠️ You already have an active bank loan of *$${formatNum(u.bankLoan.amount)}*!\nRepay it first with \`.bank repay\`.`);
+                    return msg.reply(`⚠️ You already have an active bank loan of *$${fmtCash(u.bankLoan.amount)}*!\nRepay it first with \`.bank repay\`.`);
                 }
                 const loanAmt = parseAmount(loanAmountArg);
                 if (isNaN(loanAmt) || loanAmt < 1000) {
@@ -3353,12 +3352,12 @@ client.on('messageCreate', async msg => {
                     const limitingFactor = balanceCap < band.maxLoan ? 'balance' : 'credit';
                     if (limitingFactor === 'balance') {
                         return msg.reply(
-                            `❌ Based on your recent average balance (*$${formatNum(Math.round(recentAvg))}*), you can borrow up to *$${formatNum(balanceCap)}* (${BALANCE_LOAN_MULTIPLIER}x your balance).\n` +
+                            `❌ Based on your recent average balance (*$${fmtCash(Math.round(recentAvg))}*), you can borrow up to *$${fmtCash(balanceCap)}* (${BALANCE_LOAN_MULTIPLIER}x your balance).\n` +
                             `Build up your wallet/bank balance to unlock bigger loans!`
                         );
                     }
                     return msg.reply(
-                        `❌ Your credit band (${band.label}) only allows loans up to *$${formatNum(band.maxLoan)}*.\nYour score: *${u.creditScore}* — keep repaying on time to unlock higher limits!`
+                        `❌ Your credit band (${band.label}) only allows loans up to *$${fmtCash(band.maxLoan)}*.\nYour score: *${u.creditScore}* — keep repaying on time to unlock higher limits!`
                     );
                 }
 
@@ -3379,10 +3378,10 @@ client.on('messageCreate', async msg => {
                     .setColor(0xF1C40F)
                     .setTitle('🏦 Bank Loan Sanctioned!')
                     .addFields(
-                        { name: '💵 Amount',       value: `\`$${formatNum(loanAmt)}\``,   inline: true },
+                        { name: '💵 Amount',       value: `\`$${fmtCash(loanAmt)}\``,   inline: true },
                         { name: '📦 Tier',         value: `*${tier.label}*`,               inline: true },
-                        { name: `💸 Interest (${Math.round(tier.interest*100)}%)`, value: `\`$${formatNum(interest)}\``, inline: true },
-                        { name: '🔄 Total to Repay', value: `\`$${formatNum(totalRepay)}\``, inline: true },
+                        { name: `💸 Interest (${Math.round(tier.interest*100)}%)`, value: `\`$${fmtCash(interest)}\``, inline: true },
+                        { name: '🔄 Total to Repay', value: `\`$${fmtCash(totalRepay)}\``, inline: true },
                         { name: '📅 Due In',        value: `*${tier.days} days* (<t:${Math.floor(dueDate/1000)}:R>)`, inline: true },
                     )
                     .setFooter({ text: 'Use .bank repay before the due date to protect your credit score! ⚠️ No card is seized — but your credit score will be penalised for late repayment.' });
@@ -3397,7 +3396,7 @@ client.on('messageCreate', async msg => {
                 const totalFunds = u.wallet + u.bank;
                 if (totalFunds < totalRepay) {
                     return msg.reply(
-                        `❌ You need *$${formatNum(totalRepay)}* to repay but only have *$${formatNum(totalFunds)}* (wallet + bank).`
+                        `❌ You need *$${fmtCash(totalRepay)}* to repay but only have *$${fmtCash(totalFunds)}* (wallet + bank).`
                     );
                 }
 
@@ -3439,7 +3438,7 @@ client.on('messageCreate', async msg => {
                     .setColor(0x2ECC71)
                     .setTitle('✅ Bank Loan Repaid!')
                     .addFields(
-                        { name: '💰 Repaid',          value: `\`$${formatNum(totalRepay)}\``,                    inline: true },
+                        { name: '💰 Repaid',          value: `\`$${fmtCash(totalRepay)}\``,                    inline: true },
                         { name: '⏱️ Time Taken',       value: `*${daysTaken.toFixed(1)} days*`,                  inline: true },
                         { name: '📊 Repayment Rating', value: `*${rating}*`,                                     inline: true },
                         { name: '📈 Credit Change',    value: `\`${sign}${creditDelta}\``,                       inline: true },
@@ -3451,7 +3450,7 @@ client.on('messageCreate', async msg => {
             // ── .bank credit — view credit score ─────────────────────────────
             if (bankSub === 'credit') {
                 const band    = getCreditBand(u.creditScore);
-                const maxLoan = band.maxLoan === Infinity ? 'Unlimited' : `$${formatNum(band.maxLoan)}`;
+                const maxLoan = band.maxLoan === Infinity ? 'Unlimited' : `$${fmtCash(band.maxLoan)}`;
                 const creditEmbed = new EmbedBuilder()
                     .setColor(0x3498DB)
                     .setTitle('📊 Credit Score')
@@ -3478,10 +3477,10 @@ client.on('messageCreate', async msg => {
                     .setColor(0xE67E22)
                     .setTitle('🏦 Active Bank Loan')
                     .addFields(
-                        { name: '💵 Principal',    value: `\`$${formatNum(amount)}\``,                    inline: true },
+                        { name: '💵 Principal',    value: `\`$${fmtCash(amount)}\``,                    inline: true },
                         { name: '📦 Tier',         value: `*${tLabel}*`,                                  inline: true },
-                        { name: `💸 Interest (${lTier2 ? Math.round(lTier2.interest*100) : '?'}%)`, value: `\`$${formatNum(interest)}\``, inline: true },
-                        { name: '🔄 Total Due',    value: `\`$${formatNum(totalRepay)}\``,                inline: true },
+                        { name: `💸 Interest (${lTier2 ? Math.round(lTier2.interest*100) : '?'}%)`, value: `\`$${fmtCash(interest)}\``, inline: true },
+                        { name: '🔄 Total Due',    value: `\`$${fmtCash(totalRepay)}\``,                inline: true },
                         { name: '📅 Taken',        value: `<t:${Math.floor(takenAt/1000)}:R>`,            inline: true },
                         { name: '⏰ Due',           value: `<t:${Math.floor(dueDate/1000)}:R>`,           inline: true },
                     )
@@ -3512,8 +3511,8 @@ client.on('messageCreate', async msg => {
             if (vipSub === 'buy' || vipSub === 'renew') {
                 if (u.wallet < VIP_MONTHLY_FEE) {
                     return msg.reply(
-                        `❌ *VIP Pass costs $${formatNum(VIP_MONTHLY_FEE)}/month.*\n` +
-                        `👛 You only have *$${formatNum(u.wallet)}*.\n\n` +
+                        `❌ *VIP Pass costs $${fmtCash(VIP_MONTHLY_FEE)}/month.*\n` +
+                        `👛 You only have *$${fmtCash(u.wallet)}*.\n\n` +
                         `_This pass is built for trillionaires — keep stacking!_`
                     );
                 }
@@ -3530,7 +3529,7 @@ client.on('messageCreate', async msg => {
                                 `Your VIP Pass has been extended!\n\n` +
                                 `⏳ *New expiry:* <t:${Math.floor(u.vip.expiresAt / 1000)}:F> (<t:${Math.floor(u.vip.expiresAt / 1000)}:R>)\n` +
                                 `🏦 *Bank Capacity:* 💎 *UNLIMITED*\n` +
-                                `💵 *Fee Paid:* $${formatNum(VIP_MONTHLY_FEE)}`
+                                `💵 *Fee Paid:* $${fmtCash(VIP_MONTHLY_FEE)}`
                             )],
                         reply: { messageReference: msg.id, failIfNotExists: false }
                     }).catch(() => {});
@@ -3543,8 +3542,8 @@ client.on('messageCreate', async msg => {
                                 `Welcome to the VIP club, <@${senderId}>! 🥂\n\n` +
                                 `🏦 *Bank Capacity:* 💎 *UNLIMITED* — deposit as much as you want, no cap.\n` +
                                 `⏳ *Expires:* <t:${Math.floor(u.vip.expiresAt / 1000)}:F> (<t:${Math.floor(u.vip.expiresAt / 1000)}:R>)\n` +
-                                `💵 *Fee Paid:* $${formatNum(VIP_MONTHLY_FEE)}\n\n` +
-                                `_Recharge before it expires with \`.vip buy\` or your bank goes back to \`$${formatNum(u.maxCapacity)}\`!_`
+                                `💵 *Fee Paid:* $${fmtCash(VIP_MONTHLY_FEE)}\n\n` +
+                                `_Recharge before it expires with \`.vip buy\` or your bank goes back to \`$${fmtCash(u.maxCapacity)}\`!_`
                             )],
                         allowedMentions: { users: [senderId] },
                         reply: { messageReference: msg.id, failIfNotExists: false }
@@ -3553,16 +3552,16 @@ client.on('messageCreate', async msg => {
             }
 
             // ── .vip (no args) — status ─────────────────────────────────────────
-            if (!isVipActive(u)) {
+            if (!hasVip(u)) {
                 return msg.channel.send({
                     embeds: [new EmbedBuilder()
                         .setColor(0x95A5A6)
                         .setTitle('💎 VIP Pass — For Trillionaires')
                         .setDescription(
                             `You don't have an active VIP Pass.\n\n` +
-                            `💵 *Cost:* $${formatNum(VIP_MONTHLY_FEE)} / month\n` +
+                            `💵 *Cost:* $${fmtCash(VIP_MONTHLY_FEE)} / month\n` +
                             `🏦 *Benefit:* 💎 *UNLIMITED* bank space while active — no capacity limit at all.\n` +
-                            `⚠️ If you don't recharge before it expires, your bank capacity goes right back to what it was before (currently \`$${formatNum(u.maxCapacity)}\`).\n\n` +
+                            `⚠️ If you don't recharge before it expires, your bank capacity goes right back to what it was before (currently \`$${fmtCash(u.maxCapacity)}\`).\n\n` +
                             `Buy it with \`.vip buy\`.`
                         )],
                     reply: { messageReference: msg.id, failIfNotExists: false }
@@ -3575,7 +3574,7 @@ client.on('messageCreate', async msg => {
                     .setDescription(
                         `🏦 *Bank Capacity:* 💎 *UNLIMITED*\n` +
                         `⏳ *Expires:* <t:${Math.floor(u.vip.expiresAt / 1000)}:F> (<t:${Math.floor(u.vip.expiresAt / 1000)}:R>)\n\n` +
-                        `Recharge anytime with \`.vip buy\` to extend before it runs out — otherwise your capacity reverts to \`$${formatNum(u.maxCapacity)}\`!`
+                        `Recharge anytime with \`.vip buy\` to extend before it runs out — otherwise your capacity reverts to \`$${fmtCash(u.maxCapacity)}\`!`
                     )],
                 reply: { messageReference: msg.id, failIfNotExists: false }
             }).catch(() => {});
@@ -3587,7 +3586,7 @@ client.on('messageCreate', async msg => {
             if (!party.length) return msg.reply('❌ No Pokémon! Catch one first.');
             const name=args.slice(1).join(' ').toLowerCase(); const p=name ? party.find(x=>x.name.toLowerCase()===name) : party[0];
             if (!p) return msg.reply(`❌ You don't have a Pokémon named *${name}*!`);
-            return msg.reply(`🌟 *${p.emoji} ${p.name} — EXPERIENCE*\n📈 Level: **${p.level||1}**\n✨ XP: **${p.xp||0}/${xpRequiredForLevel(p.level||1)}**\n❤️ HP: ${p.hp}/${p.maxHp}\n⚔️ ATK: ${p.atk}\n\n_Win battles or use XP foods to level up. Each level increases HP and ATK._`);
+            return msg.reply(`🌟 *${p.emoji} ${p.name} — EXPERIENCE*\n📈 Level: **${p.level||1}**\n✨ XP: **${p.xp||0}/${calcNextXp(p.level||1)}**\n❤️ HP: ${p.hp}/${p.maxHp}\n⚔️ ATK: ${p.atk}\n\n_Win battles or use XP foods to level up. Each level increases HP and ATK._`);
         }
 
         // ── .health ───────────────────────────────────────────────────────────
@@ -3605,7 +3604,7 @@ client.on('messageCreate', async msg => {
                              `🏷️ *Category:* ${p.category || p.tier || 'Unknown'}\n` +
                              `⚔️ *Attack:* ${p.atk} ATK\n` +
                              `❤️ *HP:* ${p.hp} / ${p.maxHp}\n` +
-                             `📊 [ ${makeProgressBar(p.hp, p.maxHp)} ]\n` +
+                             `📊 [ ${renderHpBar(p.hp, p.maxHp)} ]\n` +
                              `${toxic ? '☠️ *STATUS: TOXIC!* (temp debuff active)\n' : ''}` +
                              `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬`;
             try {
@@ -3627,7 +3626,7 @@ client.on('messageCreate', async msg => {
             let chosen = party.splice(idx, 1)[0];
             party.unshift(chosen); saveDB();
             return chatObj.sendMessage(
-                `🔄 *SQUAD UPDATED!*\n🟢 *Deployed:* ${chosen.emoji} *${chosen.name}* [Lv.${chosen.level||1}]\n❤️ HP: ${makeProgressBar(chosen.hp, chosen.maxHp||50)} (${chosen.hp}/${chosen.maxHp||50})`,
+                `🔄 *SQUAD UPDATED!*\n🟢 *Deployed:* ${chosen.emoji} *${chosen.name}* [Lv.${chosen.level||1}]\n❤️ HP: ${renderHpBar(chosen.hp, chosen.maxHp||50)} (${chosen.hp}/${chosen.maxHp||50})`,
                 { mentions: [senderId] }
             ).catch(() => {});
         }
@@ -3683,7 +3682,7 @@ client.on('messageCreate', async msg => {
             let senderName = senderId;
             try { const du = await client.users.fetch(senderId).catch(()=>null); if(du) senderName = du.globalName || du.username || senderId; } catch(_){}
 
-            const priceStr = price > 0 ? ` for *$${formatNum(price)}*` : ' as a **free gift**';
+            const priceStr = price > 0 ? ` for *$${fmtCash(price)}*` : ' as a **free gift**';
             return chatObj.sendMessage(
                 `🤝 *POKÉMON TRADE OFFER!*\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n` +
                 `<@${senderId}> wants to trade *${pokemon.emoji} ${pokemon.name}*${priceStr} to <@${targetId}>!\n` +
@@ -3710,7 +3709,7 @@ client.on('messageCreate', async msg => {
             // Check buyer can afford it
             if (trade.price > 0 && db[senderId].wallet < trade.price) {
                 delete pendingPokemonTrades[senderId];
-                return msg.reply(`❌ You need *$${formatNum(trade.price)}* but only have *$${formatNum(db[senderId].wallet)}*. Trade cancelled.`);
+                return msg.reply(`❌ You need *$${fmtCash(trade.price)}* but only have *$${fmtCash(db[senderId].wallet)}*. Trade cancelled.`);
             }
 
             // Execute trade
@@ -3724,7 +3723,7 @@ client.on('messageCreate', async msg => {
             delete pendingPokemonTrades[senderId];
             saveDB();
 
-            const priceStr = trade.price > 0 ? ` • <@${trade.fromId}> received *$${formatNum(trade.price)}*` : ' (free gift)';
+            const priceStr = trade.price > 0 ? ` • <@${trade.fromId}> received *$${fmtCash(trade.price)}*` : ' (free gift)';
             return chatObj.sendMessage(
                 `✅ *TRADE COMPLETE!* 🎉\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n` +
                 `${traded.emoji} *${traded.name}* now belongs to <@${senderId}>!${priceStr}\n` +
@@ -3875,8 +3874,8 @@ client.on('messageCreate', async msg => {
             if (alreadySentToday >= DAILY_TRANSFER_CAP) {
                 return msg.reply(
                     `🚫 *Daily send cap reached!*\n` +
-                    `You've already sent *$${formatNum(alreadySentToday)}* today.\n` +
-                    `Limit resets at midnight. Max: *$${formatNum(DAILY_TRANSFER_CAP)}/day*`
+                    `You've already sent *$${fmtCash(alreadySentToday)}* today.\n` +
+                    `Limit resets at midnight. Max: *$${fmtCash(DAILY_TRANSFER_CAP)}/day*`
                 );
             }
 
@@ -3892,14 +3891,14 @@ client.on('messageCreate', async msg => {
             }
             let amt = allFlag ? db[senderId].wallet : parseAmount(amtStr);
             if (isNaN(amt) || amt <= 0) return msg.reply('❌ Usage: `.transfer [amount] [@tag]`');
-            if (amt > db[senderId].wallet) return msg.reply(`❌ You only have *$${formatNum(db[senderId].wallet)}*.`);
+            if (amt > db[senderId].wallet) return msg.reply(`❌ You only have *$${fmtCash(db[senderId].wallet)}*.`);
 
             // ── PER-TX LIMIT (Amex or default $10M) ──────────────────────────
             const perTxLimit = senderAmex ? senderAmex.transferLimit : 10_000_000;
             if (perTxLimit !== Infinity && amt > perTxLimit) {
                 return msg.reply(
                     `🚫 *Transfer limit exceeded!*\n` +
-                    `Your ${senderAmex ? senderAmex.emoji + ' ' + senderAmex.name + ' Card' : 'account'} allows max *$${formatNum(perTxLimit)}* per transfer.\n` +
+                    `Your ${senderAmex ? senderAmex.emoji + ' ' + senderAmex.name + ' Card' : 'account'} allows max *$${fmtCash(perTxLimit)}* per transfer.\n` +
                     (senderAmex ? `_Upgrade your card for higher limits._` : `_Get an Amex card for higher limits: \`.cardinfo\`_`)
                 );
             }
@@ -3908,8 +3907,8 @@ client.on('messageCreate', async msg => {
             const remaining = DAILY_TRANSFER_CAP - alreadySentToday;
             if (amt > remaining) {
                 return msg.reply(
-                    `🚫 *Transfer blocked!* You can only send *$${formatNum(remaining)}* more today.\n` +
-                    `Daily cap: $${formatNum(DAILY_TRANSFER_CAP)} | Already sent: $${formatNum(alreadySentToday)}`
+                    `🚫 *Transfer blocked!* You can only send *$${fmtCash(remaining)}* more today.\n` +
+                    `Daily cap: $${fmtCash(DAILY_TRANSFER_CAP)} | Already sent: $${fmtCash(alreadySentToday)}`
                 );
             }
 
@@ -3921,7 +3920,7 @@ client.on('messageCreate', async msg => {
             if (targetAge < ONE_DAY_MS && amt > NEW_ACCT_CAP) {
                 return msg.reply(
                     `🔒 *New Account Restriction!*\n` +
-                    `That account is less than *24 hours old* and can only receive up to *$${formatNum(NEW_ACCT_CAP)}*.\n` +
+                    `That account is less than *24 hours old* and can only receive up to *$${fmtCash(NEW_ACCT_CAP)}*.\n` +
                     `_This protects against money laundering via alt accounts._`
                 );
             }
@@ -3937,14 +3936,14 @@ client.on('messageCreate', async msg => {
             if (alreadyReceivedToday >= DAILY_RECEIVE_CAP) {
                 return msg.reply(
                     `🚫 *Receive cap reached!*\n` +
-                    `That user has already received *$${formatNum(alreadyReceivedToday)}* today.\n` +
-                    `They can receive more tomorrow. Max: *$${formatNum(DAILY_RECEIVE_CAP)}/day*`
+                    `That user has already received *$${fmtCash(alreadyReceivedToday)}* today.\n` +
+                    `They can receive more tomorrow. Max: *$${fmtCash(DAILY_RECEIVE_CAP)}/day*`
                 );
             }
             const remainingReceive = DAILY_RECEIVE_CAP - alreadyReceivedToday;
             if (amt > remainingReceive) {
                 return msg.reply(
-                    `🚫 *Receive cap blocked!* That user can only receive *$${formatNum(remainingReceive)}* more today.`
+                    `🚫 *Receive cap blocked!* That user can only receive *$${fmtCash(remainingReceive)}* more today.`
                 );
             }
 
@@ -3967,7 +3966,7 @@ client.on('messageCreate', async msg => {
             saveDB();
 
             // ── Tax on large transfers is split equally among the owners ────────
-            if (tax > 0) distributeTaxToOwners(tax);
+            if (tax > 0) splitOwnerTax(tax);
 
             const txnId = 'TXN-' + Math.floor(100000 + Math.random() * 900000) + 'X';
             const newTxCount = db[senderId].dailyTransferCount;
@@ -4000,14 +3999,14 @@ client.on('messageCreate', async msg => {
                     { name: '📤 Sender', value: senderName, inline: true },
                     { name: '📥 Receiver', value: receiverName, inline: true },
                     { name: '\u200b', value: '\u200b', inline: true },
-                    { name: '💵 Amount Sent', value: `\`$${formatNum(amt)}\``, inline: true },
+                    { name: '💵 Amount Sent', value: `\`$${fmtCash(amt)}\``, inline: true },
                     ...(tax > 0 ? [
-                        { name: '🏦 Tax (20%)', value: `\`-$${formatNum(tax)}\``, inline: true },
-                        { name: '💸 Receiver Gets', value: `\`$${formatNum(amtAfterTax)}\``, inline: true },
-                    ] : [{ name: '💸 Receiver Gets', value: `\`$${formatNum(amtAfterTax)}\``, inline: true }, { name: '\u200b', value: '\u200b', inline: true }]),
+                        { name: '🏦 Tax (20%)', value: `\`-$${fmtCash(tax)}\``, inline: true },
+                        { name: '💸 Receiver Gets', value: `\`$${fmtCash(amtAfterTax)}\``, inline: true },
+                    ] : [{ name: '💸 Receiver Gets', value: `\`$${fmtCash(amtAfterTax)}\``, inline: true }, { name: '\u200b', value: '\u200b', inline: true }]),
                     { name: '🧾 Reference ID', value: `\`${txnId}\``, inline: false },
-                    { name: '👛 Your Balance', value: `\`$${formatNum(db[senderId].wallet)}\``, inline: true },
-                    { name: '📊 Daily Sent', value: `\`$${formatNum(db[senderId].dailyTransferSent)} / $${formatNum(DAILY_TRANSFER_CAP)}\``, inline: true },
+                    { name: '👛 Your Balance', value: `\`$${fmtCash(db[senderId].wallet)}\``, inline: true },
+                    { name: '📊 Daily Sent', value: `\`$${fmtCash(db[senderId].dailyTransferSent)} / $${fmtCash(DAILY_TRANSFER_CAP)}\``, inline: true },
                     { name: '🔢 Transfers Today', value: `\`${newTxCount}/15\` ${newTxCount >= 15 ? '*(2min CD active)*' : ''}`, inline: true },
                 )
                 .setAuthor({ name: senderName, iconURL: senderAvatar || undefined })
@@ -4024,8 +4023,8 @@ client.on('messageCreate', async msg => {
                     `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n` +
                     `📤 *Sender:* ${senderName} (${senderId.split('@')[0]})\n` +
                     `📥 *Receiver:* ${receiverName} (${target.split('@')[0]})\n` +
-                    `💵 *Amount:* $${formatNum(amt)}\n` +
-                    (tax > 0 ? `🏦 *Tax deducted:* $${formatNum(tax)}\n` : '') +
+                    `💵 *Amount:* $${fmtCash(amt)}\n` +
+                    (tax > 0 ? `🏦 *Tax deducted:* $${fmtCash(tax)}\n` : '') +
                     `🧾 *Ref:* \`${txnId}\`\n` +
                     `🕐 *Time:* ${new Date().toLocaleString()}\n\n` +
                     `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n` +
@@ -4059,7 +4058,7 @@ client.on('messageCreate', async msg => {
                 let rawStolen = Math.max(500, Math.min(Math.floor(db[targetId].wallet * pct), db[targetId].wallet));
                 db[targetId].wallet -= rawStolen; db[senderId].wallet += rawStolen; saveDB();
                 return chatObj.sendMessage(
-                    `🦹 *HEIST SUCCESS!* 🦹\n<@${senderId}> robbed <@${targetId}>!\n💰 Stolen: *+$${formatNum(rawStolen)}*\n👛 Your Wallet: $${formatNum(db[senderId].wallet)}`,
+                    `🦹 *HEIST SUCCESS!* 🦹\n<@${senderId}> robbed <@${targetId}>!\n💰 Stolen: *+$${fmtCash(rawStolen)}*\n👛 Your Wallet: $${fmtCash(db[senderId].wallet)}`,
                     { mentions: [senderId, targetId] }
                 ).catch(() => {});
             } else if (roll <= 80) {
@@ -4067,7 +4066,7 @@ client.on('messageCreate', async msg => {
                 db[senderId].wallet -= fine; saveDB();
                 return chatObj.sendMessage(
                     `🚔 *CAUGHT!* <@${senderId}> tried to rob <@${targetId}>!` +
-                    `\n💸 Fine: *-$${formatNum(fine)}*`,
+                    `\n💸 Fine: *-$${fmtCash(fine)}*`,
                     { mentions: [senderId, targetId] }
                 ).catch(() => {});
             } else {
@@ -4097,18 +4096,18 @@ client.on('messageCreate', async msg => {
                 let total = 0; let breakdown = '';
                 for (let c of [{key:'fish',price:200,name:'Minnow',emoji:'🐟'},{key:'salmon',price:800,name:'Salmon',emoji:'🐟'},{key:'goldenFish',price:5000,name:'Golden Fish',emoji:'✨🐟'}]) {
                     const qty = inv[c.key] || 0;
-                    if (qty > 0) { total += qty * c.price; breakdown += `${c.emoji} x${qty} ➔ +$${formatNum((qty*c.price))}\n`; inv[c.key] = 0; }
+                    if (qty > 0) { total += qty * c.price; breakdown += `${c.emoji} x${qty} ➔ +$${fmtCash((qty*c.price))}\n`; inv[c.key] = 0; }
                 }
                 if (total === 0) return msg.reply('❌ Fish inventory empty! Go `.fish` first.');
                 db[senderId].wallet += total; saveDB();
-                return msg.reply(`🐟 *BULK SALE*\n${breakdown}\n💰 Total: *+$${formatNum(total)}*\n👛 Wallet: $${formatNum(db[senderId].wallet)}`);
+                return msg.reply(`🐟 *BULK SALE*\n${breakdown}\n💰 Total: *+$${fmtCash(total)}*\n👛 Wallet: $${fmtCash(db[senderId].wallet)}`);
             }
             const entry = FISH_SELL_PRICES[item];
             if (!entry) return msg.reply('❌ Unknown item. Try `.sell fish`, `.sell salmon`, `.sell goldenfish`, or `.sell all`.');
             const qty = inv[entry.key] || 0;
             if (qty === 0) return msg.reply(`❌ No ${entry.name} to sell. Go \`.fish\` first.`);
             const earned = qty * entry.price; inv[entry.key] = 0; db[senderId].wallet += earned; saveDB();
-            return msg.reply(`🐟 Sold *${qty}x ${entry.name}* for *+$${formatNum(earned)}*!\n👛 Wallet: $${formatNum(db[senderId].wallet)}`);
+            return msg.reply(`🐟 Sold *${qty}x ${entry.name}* for *+$${fmtCash(earned)}*!\n👛 Wallet: $${fmtCash(db[senderId].wallet)}`);
         }
 
         // ── .daily ────────────────────────────────────────────────────────────
@@ -4123,7 +4122,7 @@ client.on('messageCreate', async msg => {
             initUser(senderId);
             const amt = parseAmount(args[1]);
             if (isNaN(amt) || amt <= 0) return msg.reply('❌ Usage: `.redeem [amount]`\nExample: `.redeem 50000` or `.redeem 50k`');
-            if (amt > db[senderId].wallet) return msg.reply(`❌ Not enough funds!\n💰 You have: \`$${formatNum(db[senderId].wallet)}\``);
+            if (amt > db[senderId].wallet) return msg.reply(`❌ Not enough funds!\n💰 You have: \`$${fmtCash(db[senderId].wallet)}\``);
             if (amt < 100) return msg.reply('❌ Minimum redeem amount is **$100**.');
 
 
@@ -4155,7 +4154,7 @@ client.on('messageCreate', async msg => {
                     `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n` +
                     `👤 *Creator:* ${creatorName} (${senderId})\n` +
                     `🎟️ *Code:* \`${code}\`\n` +
-                    `💵 *Amount:* $${formatNum(amt)}\n` +
+                    `💵 *Amount:* $${fmtCash(amt)}\n` +
                     `🕐 *Time:* ${new Date().toLocaleString()}\n\n` +
                     `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n` +
                     `_Review if suspicious._`;
@@ -4167,9 +4166,9 @@ client.on('messageCreate', async msg => {
                 `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n` +
                 `Code\n\`${code}\`\n` +
                 `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n` +
-                `Amount\n\`$${formatNum(amt)}\`\n` +
+                `Amount\n\`$${fmtCash(amt)}\`\n` +
                 `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n` +
-                `💰 Your Wallet: \`$${formatNum(db[senderId].wallet)}\`\n\n` +
+                `💰 Your Wallet: \`$${fmtCash(db[senderId].wallet)}\`\n\n` +
                 `Share this code with anyone — they can claim it using:\n` +
                 `\`.claim ${code}\``
             );
@@ -4204,9 +4203,9 @@ client.on('messageCreate', async msg => {
                 `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n` +
                 `Code\n\`${code}\`\n` +
                 `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n` +
-                `Amount\n\`$${formatNum(entry.amount)}\`\n` +
+                `Amount\n\`$${fmtCash(entry.amount)}\`\n` +
                 `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n` +
-                `💰 Your Wallet: \`$${formatNum(db[senderId].wallet)}\`\n\n` +
+                `💰 Your Wallet: \`$${fmtCash(db[senderId].wallet)}\`\n\n` +
                 `_Code created by <@${entry.creatorId}>_`,
                 { mentions: [senderId, entry.creatorId] }
             ).catch(() => {});
@@ -4278,7 +4277,7 @@ client.on('messageCreate', async msg => {
                     `💳 *AMEX CARD TIERS*\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n` +
                     Object.entries(AMEX_CARDS).map(([k, c]) =>
                         `${c.emoji} *.cardinfo ${k}* — ${c.name} Card\n` +
-                        `   Eligibility: $${formatNum(c.eligibility)} net worth`
+                        `   Eligibility: $${fmtCash(c.eligibility)} net worth`
                     ).join('\n\n') +
                     `\n\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n_Type \`.avail [card]\` to get a card._`
                 );
@@ -4286,12 +4285,12 @@ client.on('messageCreate', async msg => {
             return msg.reply(
                 `${card.emoji} *AMEX ${card.name.toUpperCase()} CARD* ${card.emoji}\n` +
                 `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n` +
-                `💰 *Avail Cost:* $${formatNum(card.availCost)}\n` +
-                `📅 *Weekly Maintenance:* $${formatNum(card.maintenance)}\n` +
-                `📊 *Eligibility:* $${formatNum(card.eligibility)} net worth\n\n` +
+                `💰 *Avail Cost:* $${fmtCash(card.availCost)}\n` +
+                `📅 *Weekly Maintenance:* $${fmtCash(card.maintenance)}\n` +
+                `📊 *Eligibility:* $${fmtCash(card.eligibility)} net worth\n\n` +
                 `✨ *Benefits:*\n` +
-                `📤 Transfer limit per tx: ${card.transferLimit === Infinity ? 'Unlimited' : '$' + formatNum(card.transferLimit)}\n` +
-                `📊 Daily transfer cap: ${card.dailyTransferCap === Infinity ? 'None' : '$' + formatNum(card.dailyTransferCap)}\n` +
+                `📤 Transfer limit per tx: ${card.transferLimit === Infinity ? 'Unlimited' : '$' + fmtCash(card.transferLimit)}\n` +
+                `📊 Daily transfer cap: ${card.dailyTransferCap === Infinity ? 'None' : '$' + fmtCash(card.dailyTransferCap)}\n` +
                 `⏱️ Gambling CD reduction: -${card.cdReduction * 100}%\n` +
                 `🎁 Daily reward bonus: +${card.dailyBonus * 100}%\n` +
                 `🛡️ Rob protection: ${card.robProtection === 0 ? 'None' : card.robProtection === 1 ? 'Full immunity' : (card.robProtection * 100) + '% damage reduction'}\n` +
@@ -4312,13 +4311,13 @@ client.on('messageCreate', async msg => {
             if (nw < card.eligibility) {
                 return msg.reply(
                     `❌ *Not eligible for Amex ${card.emoji} ${card.name}!*\n` +
-                    `Required net worth: *$${formatNum(card.eligibility)}*\n` +
-                    `Your net worth: *$${formatNum(nw)}*\n` +
-                    `Still need: *$${formatNum(card.eligibility - nw)}*`
+                    `Required net worth: *$${fmtCash(card.eligibility)}*\n` +
+                    `Your net worth: *$${fmtCash(nw)}*\n` +
+                    `Still need: *$${fmtCash(card.eligibility - nw)}*`
                 );
             }
             if (db[senderId].wallet < card.availCost) {
-                return msg.reply(`❌ You need *$${formatNum(card.availCost)}* in your wallet to avail this card.\nYou have: *$${formatNum(db[senderId].wallet)}*`);
+                return msg.reply(`❌ You need *$${fmtCash(card.availCost)}* in your wallet to avail this card.\nYou have: *$${fmtCash(db[senderId].wallet)}*`);
             }
 
             db[senderId].wallet -= card.availCost;
@@ -4335,9 +4334,9 @@ client.on('messageCreate', async msg => {
                 `${card.emoji} *AMEX ${card.name.toUpperCase()} CARD ACTIVATED!* ${card.emoji}\n` +
                 `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n` +
                 `✅ Card successfully availed!\n` +
-                `💸 Avail fee deducted: *-$${formatNum(card.availCost)}*\n` +
-                `👛 Remaining wallet: *$${formatNum(db[senderId].wallet)}*\n\n` +
-                `📅 *Weekly maintenance:* $${formatNum(card.maintenance)}/week\n` +
+                `💸 Avail fee deducted: *-$${fmtCash(card.availCost)}*\n` +
+                `👛 Remaining wallet: *$${fmtCash(db[senderId].wallet)}*\n\n` +
+                `📅 *Weekly maintenance:* $${fmtCash(card.maintenance)}/week\n` +
                 `💡 Pay with *.paymaint* every week to keep it active!\n` +
                 `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n` +
                 `🏅 Badge unlocked: *${card.badge}*`
@@ -4372,10 +4371,10 @@ client.on('messageCreate', async msg => {
                 `✅ *Status:* ${amex.active ? '🟢 Active' : '🔴 Deactivated'}\n` +
                 (graceLeft !== null ? `⚠️ *Grace period:* ${graceLeft} days left before permanent cancel!\n` : '') +
                 `📅 *Next maintenance:* ${amex.active ? `in ${daysLeft}d ${hoursLeft}h` : 'Overdue — pay now!'}\n` +
-                `💰 *Maintenance cost:* $${formatNum(card.maintenance)}/week\n\n` +
+                `💰 *Maintenance cost:* $${fmtCash(card.maintenance)}/week\n\n` +
                 `✨ *Active Benefits:*\n` +
-                `📤 Transfer limit: ${card.transferLimit === Infinity ? 'Unlimited' : '$' + formatNum(card.transferLimit)}\n` +
-                `📊 Daily transfer cap: ${card.dailyTransferCap === Infinity ? 'None' : '$' + formatNum(card.dailyTransferCap)}\n` +
+                `📤 Transfer limit: ${card.transferLimit === Infinity ? 'Unlimited' : '$' + fmtCash(card.transferLimit)}\n` +
+                `📊 Daily transfer cap: ${card.dailyTransferCap === Infinity ? 'None' : '$' + fmtCash(card.dailyTransferCap)}\n` +
                 `⏱️ Gambling CD: -${card.cdReduction * 100}%\n` +
                 `🎁 Daily bonus: +${card.dailyBonus * 100}%\n` +
                 `🛡️ Rob protection: ${card.robProtection === 0 ? 'None' : card.robProtection === 1 ? 'Full immunity' : (card.robProtection * 100) + '% damage reduction'}\n` +
@@ -4405,8 +4404,8 @@ client.on('messageCreate', async msg => {
             if (db[senderId].wallet < card.maintenance) {
                 return msg.reply(
                     `❌ *Insufficient funds for maintenance!*\n` +
-                    `Required: *$${formatNum(card.maintenance)}*\n` +
-                    `Your wallet: *$${formatNum(db[senderId].wallet)}*\n\n` +
+                    `Required: *$${fmtCash(card.maintenance)}*\n` +
+                    `Your wallet: *$${fmtCash(db[senderId].wallet)}*\n\n` +
                     `⚠️ _Deposit money and pay soon or your card will be deactivated!_`
                 );
             }
@@ -4421,8 +4420,8 @@ client.on('messageCreate', async msg => {
                 `${card.emoji} *MAINTENANCE PAID!* ${card.emoji}\n` +
                 `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n` +
                 `✅ Card active for another 7 days!\n` +
-                `💸 Deducted: *-$${formatNum(card.maintenance)}*\n` +
-                `👛 Wallet: *$${formatNum(db[senderId].wallet)}*\n` +
+                `💸 Deducted: *-$${fmtCash(card.maintenance)}*\n` +
+                `👛 Wallet: *$${fmtCash(db[senderId].wallet)}*\n` +
                 `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬`
             );
         }
@@ -4455,10 +4454,10 @@ client.on('messageCreate', async msg => {
             return msg.reply(
                 `🎁 *DAILY REWARD UNLOCKED!* 🎁\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n` +
                 `${streakEmoji} *Streak:* ${streak} day${streak>1?'s':''}\n` +
-                `💵 Base: *+$${formatNum(base)}*\n⭐ Streak Bonus: *+$${formatNum(bonus)}*\n` +
-                (amexBonus > 0 ? `${amexData ? AMEX_CARDS[amexData.tier].emoji : ''} Amex Bonus: *+$${formatNum(amexBonus)}*\n` : '') +
+                `💵 Base: *+$${fmtCash(base)}*\n⭐ Streak Bonus: *+$${fmtCash(bonus)}*\n` +
+                (amexBonus > 0 ? `${amexData ? AMEX_CARDS[amexData.tier].emoji : ''} Amex Bonus: *+$${fmtCash(amexBonus)}*\n` : '') +
                 `🔴 Free Pokéballs: *+${balls}*\n` +
-                `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n💰 *Total: +$${formatNum(total)}*\n👛 Wallet: $${formatNum(db[senderId].wallet)}`
+                `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n💰 *Total: +$${fmtCash(total)}*\n👛 Wallet: $${fmtCash(db[senderId].wallet)}`
             );
         }
 
@@ -4472,7 +4471,7 @@ client.on('messageCreate', async msg => {
                 let menu = `🔴 *POKÉBALL SHOP* 🔴\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n`;
                 for (let key in POKEBALL_SHOP) {
                     const b = POKEBALL_SHOP[key];
-                    menu += `${b.emoji} *${b.name}* — $${formatNum(b.price)} (\`.buy ${key}\`)\n📝 ${b.desc}\n\n`;
+                    menu += `${b.emoji} *${b.name}* — $${fmtCash(b.price)} (\`.buy ${key}\`)\n📝 ${b.desc}\n\n`;
                 }
                 return msg.reply(menu);
             }
@@ -4484,7 +4483,7 @@ client.on('messageCreate', async msg => {
                 let menu = `🌟 *EVOLUTION STONE SHOP* 🌟\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n`;
                 for (let key in STONE_SHOP) {
                     const s = STONE_SHOP[key];
-                    menu += `${s.emoji} *${s.name}* — $${formatNum(s.price)} (\`.buy ${key}\`)\n📝 ${s.desc}\n\n`;
+                    menu += `${s.emoji} *${s.name}* — $${fmtCash(s.price)} (\`.buy ${key}\`)\n📝 ${s.desc}\n\n`;
                 }
                 return msg.reply(menu);
             }
@@ -4492,7 +4491,7 @@ client.on('messageCreate', async msg => {
                 let menu = `🍬 *POKÉMON ITEMS* 🍬\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n`;
                 for (let key in RARE_CANDY_SHOP) {
                     const item = RARE_CANDY_SHOP[key];
-                    menu += `${item.emoji} *${item.name}* — $${formatNum(item.price)} (.buy ${key})\n📝 ${item.desc}\n\n`;
+                    menu += `${item.emoji} *${item.name}* — $${fmtCash(item.price)} (.buy ${key})\n📝 ${item.desc}\n\n`;
                 }
                 return msg.reply(menu);
             }
@@ -4523,7 +4522,7 @@ client.on('messageCreate', async msg => {
                     return msg.reply(`❌ This round is full and drawing now — try again once a new round opens!`);
                 }
                 if (db[senderId].wallet < LOTTERY_TICKET_PRICE) {
-                    return msg.reply(`❌ Not enough funds!\n🎟️ Ticket costs: *$${formatNum(LOTTERY_TICKET_PRICE)}*\n👛 Your wallet: *$${formatNum(db[senderId].wallet)}*`);
+                    return msg.reply(`❌ Not enough funds!\n🎟️ Ticket costs: *$${fmtCash(LOTTERY_TICKET_PRICE)}*\n👛 Your wallet: *$${fmtCash(db[senderId].wallet)}*`);
                 }
                 db[senderId].wallet -= LOTTERY_TICKET_PRICE;
                 lottery.entries.push(senderId);
@@ -4532,7 +4531,7 @@ client.on('messageCreate', async msg => {
                 const slotsLeft = LOTTERY_POOL_SIZE - lottery.entries.length;
                 await msg.reply(
                     `🎟️ *LOTTERY TICKET PURCHASED!* 🎟️\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n` +
-                    `🎰 You're entered in this round!\n💳 Paid: *-$${formatNum(LOTTERY_TICKET_PRICE)}*\n👛 Wallet: $${formatNum(db[senderId].wallet)}\n\n` +
+                    `🎰 You're entered in this round!\n💳 Paid: *-$${fmtCash(LOTTERY_TICKET_PRICE)}*\n👛 Wallet: $${fmtCash(db[senderId].wallet)}\n\n` +
                     `👥 Pool: *${lottery.entries.length}/${LOTTERY_POOL_SIZE}*` +
                     (slotsLeft > 0 ? ` — ${slotsLeft} more ticket(s) needed to trigger the draw!` : ` — draw triggering now! 🎉`) + `\n\n` +
                     `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n_Check live status anytime with \`.ll\`_`
@@ -4547,28 +4546,28 @@ client.on('messageCreate', async msg => {
 
             if (FOOD_SHOP[itemKey]) {
                 let prod = FOOD_SHOP[itemKey];
-                if (db[senderId].wallet < prod.price) return msg.reply(`❌ Not enough cash! Price: $${formatNum(prod.price)}`);
+                if (db[senderId].wallet < prod.price) return msg.reply(`❌ Not enough cash! Price: $${fmtCash(prod.price)}`);
                 db[senderId].wallet -= prod.price;
                 db[senderId].inventory[itemKey] = (db[senderId].inventory[itemKey] || 0) + 1; saveDB();
                 return msg.reply(`🛍️ Purchased 1x ${prod.emoji} *${prod.name}*! Check \`.inv\`.`);
             }
             if (POKEBALL_SHOP[itemKey]) {
                 let ball = POKEBALL_SHOP[itemKey];
-                if (db[senderId].wallet < ball.price) return msg.reply(`❌ Not enough cash! Price: $${formatNum(ball.price)}`);
+                if (db[senderId].wallet < ball.price) return msg.reply(`❌ Not enough cash! Price: $${fmtCash(ball.price)}`);
                 db[senderId].wallet -= ball.price;
                 db[senderId].inventory[itemKey] = (db[senderId].inventory[itemKey] || 0) + 1; saveDB();
                 return msg.reply(`🛍️ Purchased 1x ${ball.emoji} *${ball.name}*! Check \`.inv\`.`);
             }
             if (STONE_SHOP[itemKey]) {
                 let stone = STONE_SHOP[itemKey];
-                if (db[senderId].wallet < stone.price) return msg.reply(`❌ Not enough cash! Price: $${formatNum(stone.price)}`);
+                if (db[senderId].wallet < stone.price) return msg.reply(`❌ Not enough cash! Price: $${fmtCash(stone.price)}`);
                 db[senderId].wallet -= stone.price;
                 db[senderId].inventory[itemKey] = (db[senderId].inventory[itemKey] || 0) + 1; saveDB();
                 return msg.reply(`🛍️ Purchased 1x ${stone.emoji} *${stone.name}*! Use \`.evolve <pokemon>\` to evolve an eligible Pokémon.`);
             }
             if (RARE_CANDY_SHOP[itemKey]) {
                 const candy = RARE_CANDY_SHOP[itemKey];
-                if (db[senderId].wallet < candy.price) return msg.reply(`❌ Not enough cash! Price: $${formatNum(candy.price)}`);
+                if (db[senderId].wallet < candy.price) return msg.reply(`❌ Not enough cash! Price: $${fmtCash(candy.price)}`);
                 db[senderId].wallet -= candy.price;
                 db[senderId].inventory[itemKey] = (db[senderId].inventory[itemKey] || 0) + 1;
                 saveDB();
@@ -4590,7 +4589,7 @@ client.on('messageCreate', async msg => {
             if (!inv.rarecandy || inv.rarecandy <= 0) return msg.reply('❌ You need 🍬 *Rare Candy*. Buy one with `.buy rarecandy`.');
             const oldLevel = poke.level || 1;
             inv.rarecandy -= 1;
-            const xr = addPokemonXp(poke, xpRequiredForLevel(oldLevel));
+            const xr = addPokemonXp(poke, calcNextXp(oldLevel));
             saveDB();
             return msg.reply(
                 `🍬 *${poke.emoji} ${poke.name}* used a Rare Candy!
@@ -4620,7 +4619,7 @@ client.on('messageCreate', async msg => {
 
             const inv = db[senderId].inventory;
             if (!inv.evolutionstone || inv.evolutionstone <= 0) {
-                return msg.reply(`❌ You need a 🌟💎 *Evolution Stone*! Buy one with \`.buy evolutionstone\` ($${formatNum(STONE_SHOP.evolutionstone.price)}).`);
+                return msg.reply(`❌ You need a 🌟💎 *Evolution Stone*! Buy one with \`.buy evolutionstone\` ($${fmtCash(STONE_SHOP.evolutionstone.price)}).`);
             }
 
             const evolvedData = WILD_POKEMON_POOL.find(w => w.name.toLowerCase() === evolvedName.toLowerCase());
@@ -4852,7 +4851,7 @@ client.on('messageCreate', async msg => {
             return msg.reply(
                 `🐾 Fed 1x ${food.emoji} *${food.name}* to *${targetPoke.emoji} ${targetPoke.name}*!\n` +
                 `❤️ HP: ${initHp}/${targetPoke.maxHp} ➔ *${targetPoke.hp}/${targetPoke.maxHp}*` +
-                (atkGain > 0 ? `\n⚔️ ATK: ${initAtk} ➔ *${targetPoke.atk}* (+${formatNum(atkGain)})` : '') +
+                (atkGain > 0 ? `\n⚔️ ATK: ${initAtk} ➔ *${targetPoke.atk}* (+${fmtCash(atkGain)})` : '') +
                 (food.xpBonus ? `\n⭐ +${food.xpBonus} XP!` : '') +
                 (food.atkBuff ? `\n⚡ +${food.atkBuff} instant ATK buff for your next *PvP battle* only!` : '')
             );
@@ -5134,7 +5133,7 @@ client.on('messageCreate', async msg => {
                 if (firstCaught) {
                     delete wildPokemonState[cid];
                     db[senderId].pokemon.push({
-                        name: wild.name, tier: wild.rarity, category: wild.category||wild.rarity, level: 1, xp: 0, maxXp: xpRequiredForLevel(1),
+                        name: wild.name, tier: wild.rarity, category: wild.category||wild.rarity, level: 1, xp: 0, maxXp: calcNextXp(1),
                         hp: wild.hp, maxHp: wild.hp, atk: wild.atk, emoji: wild.emoji, dexId: wild.dexId,
                         gender: Math.random() > 0.5 ? '♂' : '♀'
                     });
@@ -5263,11 +5262,11 @@ client.on('messageCreate', async msg => {
                 if (alreadyOwns) {
                     const bonus = Math.floor(Math.random() * 30000) + 10000;
                     db[senderId].wallet += bonus; saveDB();
-                    resultMsg = `🎉 *CAUGHT!* But you already own *${wild.name}*!\n💰 Released for a bounty: *+$${formatNum(bonus)}*!`;
+                    resultMsg = `🎉 *CAUGHT!* But you already own *${wild.name}*!\n💰 Released for a bounty: *+$${fmtCash(bonus)}*!`;
                 } else {
                     db[senderId].pokemon = db[senderId].pokemon || [];
                     db[senderId].pokemon.push({
-                        name: wild.name, tier: wild.rarity, category: wild.category||wild.rarity, level: 1, xp: 0, maxXp: xpRequiredForLevel(1),
+                        name: wild.name, tier: wild.rarity, category: wild.category||wild.rarity, level: 1, xp: 0, maxXp: calcNextXp(1),
                         hp: wild.hp, maxHp: wild.hp, atk: wild.atk, emoji: wild.emoji, dexId: wild.dexId,
                         gender: Math.random() > 0.5 ? '♂' : '♀'
                     });
@@ -5328,9 +5327,9 @@ client.on('messageCreate', async msg => {
                 `🕐 *Last Daily:* ${lastActiveDate}\n\n` +
                 `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n` +
                 `💰 *FINANCIALS*\n` +
-                `👛 Wallet: *$${formatNum(u.wallet)}*\n` +
-                `🏦 Bank: *$${formatNum(u.bank)}*\n` +
-                `💎 Net Worth: *$${formatNum((u.wallet + u.bank))}*\n\n` +
+                `👛 Wallet: *$${fmtCash(u.wallet)}*\n` +
+                `🏦 Bank: *$${fmtCash(u.bank)}*\n` +
+                `💎 Net Worth: *$${fmtCash((u.wallet + u.bank))}*\n\n` +
                 `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n` +
                 `🎲 *GAMBLING HISTORY*\n` +
                 `🎰 Last Casino: ${lastGambleDate}\n` +
@@ -5573,8 +5572,8 @@ client.on('messageCreate', async msg => {
             return chatObj.sendMessage(
                 `🙏 *BEG RESULT* 🙏\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n` +
                 `💬 ${roastLine}\n\n` +
-                `💰 <@${senderId}> received *+$${formatNum(earned)}*!\n` +
-                `👛 Wallet: $${formatNum(db[senderId].wallet)}\n` +
+                `💰 <@${senderId}> received *+$${fmtCash(earned)}*!\n` +
+                `👛 Wallet: $${fmtCash(db[senderId].wallet)}\n` +
                 `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬`,
                 { mentions: [senderId] }
             ).catch(() => {});
@@ -5620,13 +5619,13 @@ client.on('messageCreate', async msg => {
             let menu = `🔴 *POKÉBALLS*\n`;
             for (let key in POKEBALL_SHOP) {
                 const b = POKEBALL_SHOP[key];
-                menu += `${b.emoji} *${b.name}* — $${formatNum(b.price)}\n   📝 ${b.desc}\n   _(buy: \`.buy ${key}\`)_\n\n`;
+                menu += `${b.emoji} *${b.name}* — $${fmtCash(b.price)}\n   📝 ${b.desc}\n   _(buy: \`.buy ${key}\`)_\n\n`;
             }
             menu += `🍗 *POKÉMON FOOD*\n` + buildFoodShopMenu(); 
             menu += `\n\n🍬 *POKÉMON ITEMS*\n`;
             for (let key in RARE_CANDY_SHOP) {
                 const item = RARE_CANDY_SHOP[key];
-                menu += `${item.emoji} *${item.name}* — $${formatNum(item.price)}\n   📝 ${item.desc}\n   _(buy: .buy ${key})_\n\n`;
+                menu += `${item.emoji} *${item.name}* — $${fmtCash(item.price)}\n   📝 ${item.desc}\n   _(buy: .buy ${key})_\n\n`;
             }
             await sendLongEmbed(msg, {
                 title: '🏪 POKÉMON STORE 🏪',
@@ -5660,8 +5659,8 @@ client.on('messageCreate', async msg => {
             let txt = `💎 *TOP 10 RICHEST PLAYERS* 💎\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n`;
             top.forEach((r, i) => {
                 txt += `${medals[i]} <@${r.uid}>\n`;
-                txt += `   💰 Wallet: $${formatNum(r.wallet)} | 🏦 Bank: $${formatNum(r.bank)}\n`;
-                txt += `   💎 Net Worth: *$${formatNum(r.total)}*\n\n`;
+                txt += `   💰 Wallet: $${fmtCash(r.wallet)} | 🏦 Bank: $${fmtCash(r.bank)}\n`;
+                txt += `   💎 Net Worth: *$${fmtCash(r.total)}*\n\n`;
             });
             txt += `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬`;
             const mentions = top.map(r => r.uid);
@@ -5953,8 +5952,8 @@ client.on('messageCreate', async msg => {
                 `${emoji} *BALANCE ${command === '.addmoney' ? 'ADDED' : 'REMOVED'}* ${emoji}\n` +
                 `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n` +
                 `👤 *User:* ${targetName} (${targetId})\n` +
-                `💵 *Amount ${verb} wallet:* $${formatNum(amt)}\n` +
-                `👛 *New Balance:* $${formatNum(db[targetId].wallet)}\n` +
+                `💵 *Amount ${verb} wallet:* $${fmtCash(amt)}\n` +
+                `👛 *New Balance:* $${fmtCash(db[targetId].wallet)}\n` +
                 `⚖️ *Action by:* <@${senderId}>\n` +
                 `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬`,
                 { mentions: [targetId, senderId] }
@@ -5970,7 +5969,7 @@ client.on('messageCreate', async msg => {
 
             const activeBankLoan  = u.bankLoan  || null;
             const bankLoanLine    = activeBankLoan
-                ? `⚠️ *$${formatNum(activeBankLoan.totalRepay)}* due <t:${Math.floor(activeBankLoan.dueDate/1000)}:R>`
+                ? `⚠️ *$${fmtCash(activeBankLoan.totalRepay)}* due <t:${Math.floor(activeBankLoan.dueDate/1000)}:R>`
                 : `✅ None`;
 
             const bankInfoText =
@@ -5978,8 +5977,8 @@ client.on('messageCreate', async msg => {
                 `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n` +
 
                 `💰 *YOUR FINANCES*\n` +
-                `👛 Wallet: *$${formatNum(u.wallet)}*  _(vulnerable to .rob)_\n` +
-                `🏦 Bank: *$${formatNum(u.bank)}* / *${formatCapacity(u)}* capacity\n` +
+                `👛 Wallet: *$${fmtCash(u.wallet)}*  _(vulnerable to .rob)_\n` +
+                `🏦 Bank: *$${fmtCash(u.bank)}* / *${formatCapacity(u)}* capacity\n` +
                 `📊 Credit Score: *${creditScore}* — ${band.label}\n` +
                 `🏦 Bank Loan: ${bankLoanLine}\n` +
 
@@ -6062,7 +6061,7 @@ client.on('messageCreate', async msg => {
                 return msg.reply('❌ No users found in the database yet!');
 
             const medals = ['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
-            const short = n => n >= 1e9 ? (n/1e9).toFixed(2)+'B' : n >= 1e6 ? (n/1e6).toFixed(2)+'M' : n >= 1e3 ? (n/1e3).toFixed(2)+'K' : formatNum(n);
+            const short = n => n >= 1e9 ? (n/1e9).toFixed(2)+'B' : n >= 1e6 ? (n/1e6).toFixed(2)+'M' : n >= 1e3 ? (n/1e3).toFixed(2)+'K' : fmtCash(n);
 
             // Resolve names + avatars for each entry (no pings)
             let desc = '';
@@ -6479,19 +6478,19 @@ client.on('messageCreate', async msg => {
             out += `👜 *DESIGNER BAGS*\n_(Replaces your current bag in inventory)_\n\n`;
             for (const [k, bag] of Object.entries(AMAZON_BAGS)) {
                 out += `${bag.emoji} *${bag.name}*\n`;
-                out += `   💰 Price: *$${formatNum(bag.price)}*\n`;
+                out += `   💰 Price: *$${fmtCash(bag.price)}*\n`;
                 out += `   📋 ${bag.desc}\n`;
                 out += `   🛒 Buy: \`.amazon buy bag ${k}\`\n\n`;
             }
             out += `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n`;
             out += `🎟️ *LOTTERY TICKET*\n_(5 entrants per round — top 3 win cash!)_\n\n`;
             out += `🎰 *Lottery Ticket*\n`;
-            out += `   💰 Price: *$${formatNum(LOTTERY_TICKET_PRICE)}*\n`;
+            out += `   💰 Price: *$${fmtCash(LOTTERY_TICKET_PRICE)}*\n`;
             out += `   📋 1st: $300K-$500K | 2nd: $160K-$200K | 3rd: $70K-$150K\n`;
             out += `   🛒 Buy: \`.buy lottery\`\n`;
             out += `   📊 Check status: \`.ll\`\n\n`;
             out += `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n`;
-            out += `💳 *Your wallet:* $${formatNum(db[senderId].wallet)}\n`;
+            out += `💳 *Your wallet:* $${fmtCash(db[senderId].wallet)}\n`;
             out += `👜 *Current bag:* ${db[senderId].inventory.assignedBag || 'Basic Sack'}`;
             return msg.reply(out);
         }
@@ -6501,14 +6500,14 @@ client.on('messageCreate', async msg => {
             const bagKey = (args[3] || '').toLowerCase();
             const bag    = AMAZON_BAGS[bagKey];
             if (!bag) return msg.reply(`❌ Unknown bag! Valid: ${Object.keys(AMAZON_BAGS).map(k => `\`.amazon buy bag ${k}\``).join(', ')}`);
-            if (db[senderId].wallet < bag.price) return msg.reply(`❌ Not enough funds!\n💰 *${bag.name}* costs: *$${formatNum(bag.price)}*\n👛 Your wallet: *$${formatNum(db[senderId].wallet)}*`);
+            if (db[senderId].wallet < bag.price) return msg.reply(`❌ Not enough funds!\n💰 *${bag.name}* costs: *$${fmtCash(bag.price)}*\n👛 Your wallet: *$${fmtCash(db[senderId].wallet)}*`);
             const oldBag = db[senderId].inventory.assignedBag || 'Basic Sack';
             db[senderId].wallet -= bag.price;
             db[senderId].inventory.assignedBag = bag.name; saveDB();
             return msg.reply(
                 `${bag.emoji} *BAG PURCHASED!* ${bag.emoji}\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n` +
                 `👜 *${bag.name}* is now in your inventory!\n📋 ${bag.desc}\n\n` +
-                `🔄 Replaced: *${oldBag}*\n💳 Paid: *-$${formatNum(bag.price)}*\n👛 Wallet: $${formatNum(db[senderId].wallet)}\n\n` +
+                `🔄 Replaced: *${oldBag}*\n💳 Paid: *-$${fmtCash(bag.price)}*\n👛 Wallet: $${fmtCash(db[senderId].wallet)}\n\n` +
                 `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n_Check \`.inv\` to see your new bag! 🎒_`
             );
         }
@@ -6610,7 +6609,7 @@ client.once('ready', () => {
                 if (discordUser) {
                     await discordUser.send(
                         `⚠️ *Your Amex ${card.emoji} ${card.name} Card has been deactivated!*\n\n` +
-                        `Weekly maintenance of *$${formatNum(card.maintenance)}* was not paid.\n` +
+                        `Weekly maintenance of *$${fmtCash(card.maintenance)}* was not paid.\n` +
                         `All card benefits are now suspended.\n\n` +
                         `Pay now with *.paymaint* to reactivate.\n` +
                         `⏳ You have *7 days* before the card is permanently cancelled!`
@@ -6629,7 +6628,7 @@ client.once('ready', () => {
                         await discordUser.send(
                             `🚨 *2 days left before your Amex ${card.emoji} ${card.name} is permanently cancelled!*\n\n` +
                             `Pay maintenance now with *.paymaint* to save your card!\n` +
-                            `Cost: *$${formatNum(card.maintenance)}*`
+                            `Cost: *$${fmtCash(card.maintenance)}*`
                         ).catch(() => {});
                     }
                 }
@@ -6660,7 +6659,7 @@ client.once('ready', () => {
                     if (discordUser) {
                         await discordUser.send(
                             `💳 *Weekly maintenance reminder!*\n` +
-                            `Your Amex ${card.emoji} ${card.name} maintenance of *$${formatNum(card.maintenance)}* is due in ~2 hours.\n` +
+                            `Your Amex ${card.emoji} ${card.name} maintenance of *$${fmtCash(card.maintenance)}* is due in ~2 hours.\n` +
                             `Pay now with *.paymaint* to keep your card active!`
                         ).catch(() => {});
                     }
@@ -6687,7 +6686,7 @@ client.once('ready', () => {
                 u.bankLoanOverdueAt = now;
                 u.creditScore = Math.max(0, (u.creditScore || 500) - 20);
                 const du = await client.users.fetch(userId).catch(() => null);
-                if (du) await du.send('⚠️ *BANK LOAN OVERDUE*\\n\\nYour loan of **$' + formatNum(loan.totalRepay) + '** is past due.\\n📉 Civil score: **-20**\\n💸 Repay with **.loan repay** as soon as possible.\\n\\nIf it stays unpaid for 48 hours after the due date, a temporary economy/gambling restriction will be applied.').catch(() => {});
+                if (du) await du.send('⚠️ *BANK LOAN OVERDUE*\\n\\nYour loan of **$' + fmtCash(loan.totalRepay) + '** is past due.\\n📉 Civil score: **-20**\\n💸 Repay with **.loan repay** as soon as possible.\\n\\nIf it stays unpaid for 48 hours after the due date, a temporary economy/gambling restriction will be applied.').catch(() => {});
             } else if (now - u.bankLoanOverdueAt >= 48 * 60 * 60 * 1000 && !u.loanDefaultBanUntil) {
                 u.loanDefaultBanUntil = now + 7 * 24 * 60 * 60 * 1000;
                 u.loanBanUntil = now + 4 * 24 * 60 * 60 * 1000;
@@ -6723,8 +6722,8 @@ client.once('ready', () => {
                     await discordUser.send(
                         `💔 *Your VIP Pass has expired!*\n\n` +
                         `You didn't recharge in time, so unlimited bank space has been turned off.\n` +
-                        `🏦 *Bank Capacity is now back to:* $${formatNum(userData.maxCapacity || 500_000)}\n\n` +
-                        `Recharge anytime with *.vip buy* ($${formatNum(VIP_MONTHLY_FEE)}/month) to go unlimited again!`
+                        `🏦 *Bank Capacity is now back to:* $${fmtCash(userData.maxCapacity || 500_000)}\n\n` +
+                        `Recharge anytime with *.vip buy* ($${fmtCash(VIP_MONTHLY_FEE)}/month) to go unlimited again!`
                     ).catch(() => {});
                 }
                 continue;
@@ -6739,8 +6738,8 @@ client.once('ready', () => {
                     await discordUser.send(
                         `💎 *VIP Pass reminder!*\n\n` +
                         `Your VIP Pass expires in about *3 days* (<t:${Math.floor(vip.expiresAt / 1000)}:R>).\n` +
-                        `Recharge now with *.vip buy* ($${formatNum(VIP_MONTHLY_FEE)}) to keep your bank *UNLIMITED*!\n` +
-                        `⚠️ If it lapses, your bank capacity goes back to $${formatNum(userData.maxCapacity || 500_000)}.`
+                        `Recharge now with *.vip buy* ($${fmtCash(VIP_MONTHLY_FEE)}) to keep your bank *UNLIMITED*!\n` +
+                        `⚠️ If it lapses, your bank capacity goes back to $${fmtCash(userData.maxCapacity || 500_000)}.`
                     ).catch(() => {});
                 }
             }
@@ -6753,7 +6752,7 @@ client.once('ready', () => {
                 if (discordUser) {
                     await discordUser.send(
                         `🚨 *VIP Pass expiring in ~24 hours!* 🚨\n\n` +
-                        `Recharge now with *.vip buy* ($${formatNum(VIP_MONTHLY_FEE)}) or you'll lose *UNLIMITED* bank space tomorrow — it'll drop to $${formatNum(userData.maxCapacity || 500_000)}!`
+                        `Recharge now with *.vip buy* ($${fmtCash(VIP_MONTHLY_FEE)}) or you'll lose *UNLIMITED* bank space tomorrow — it'll drop to $${fmtCash(userData.maxCapacity || 500_000)}!`
                     ).catch(() => {});
                 }
             }
