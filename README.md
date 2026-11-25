@@ -6,6 +6,9 @@ Every command starts with a dot, like `.bal`. Before anything works you have to 
 
 ## Installation
 
+📺 **[Watch the Installation & Gameplay Guide on YouTube](https://youtu.be/snkU6hgtJpg)**
+
+
 You need Node.js (version 18 or newer), Git, and a bot token from Discord.
 
 **Making the bot on Discord**
